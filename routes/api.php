@@ -1,17 +1,17 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Route;
 
 // Các Route công khai (Không cần đăng nhập)
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [Controller::class, 'register']);
+Route::post('/login', [Controller::class, 'login']);
 
 // Các Route yêu cầu phải xác thực qua Sanctum
 Route::middleware('auth:sanctum')->group(function () {
     
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/logout', [Controller::class, 'logout']);
+    Route::get('/me', [Controller::class, 'me']);
 
     // Ví dụ phân quyền: Giả định 1: Quản lý kho, 2: Nhân viên, 3: Kế toán
     Route::middleware('role:1')->group(function () {
