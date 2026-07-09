@@ -13,6 +13,9 @@ return new class extends Migration
     {
         Schema::create('inventories', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('product_id')->constrained();
+            $table->foreignId('warehouse_id')->constrained();
+            $table->integer('quantity')->default(0);
             $table->timestamps();
         });
     }
