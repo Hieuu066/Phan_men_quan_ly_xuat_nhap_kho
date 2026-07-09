@@ -1,0 +1,73 @@
+:root {
+  /* ── Màu sắc chính ─────────────────────────────────── */
+  --clr-primary: #1a5276;
+  --clr-primary-h: #154360; /* hover */
+  --clr-primary-l: #2980b9; /* light */
+  --clr-primary-bg: #ebf5fb; /* background nhạt */
+  --clr-secondary: #27ae60;
+  --clr-secondary-h: #1e8449;
+  --clr-danger: #e74c3c;
+  --clr-warning: #f39c12;
+  --clr-info: #3498db;
+  --clr-success: #2ecc71;
+
+  /* ── Màu trung tính ────────────────────────────────── */
+  --clr-dark: #2c3e50;
+  --clr-gray-100: #f8f9fa;
+  --clr-gray-200: #e9ecef;
+  --clr-gray-300: #dee2e6;
+  --clr-gray-400: #ced4da;
+  --clr-gray-500: #adb5bd;
+  --clr-gray-600: #6c757d;
+  --clr-gray-700: #495057;
+  --clr-gray-800: #343a40;
+  --clr-white: #ffffff;
+
+  /* ── Typography ─────────────────────────────────────── */
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Fira Code", "Consolas", monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* ── Spacing ─────────────────────────────────────────── */
+  --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem;
+  --sp-4: 1rem; --sp-5: 1.25rem; --sp-6: 1.5rem;
+  --sp-8: 2rem; --sp-10: 2.5rem; --sp-12: 3rem;
+  --sp-16: 4rem;
+
+  /* ── Border radius ───────────────────────────────────── */
+  --r-sm: 0.25rem; --r-md: 0.5rem;
+  --r-lg: 0.75rem; --r-xl: 1rem;
+  --r-full: 9999px;
+
+  /* ── Shadows ─────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
+  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.08);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,.1);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,.12);
+
+  /* ── Transitions ─────────────────────────────────────── */
+  --transition: 0.2s ease;
+  --transition-slow: 0.35s ease;
+
+  /* ── Layout ──────────────────────────────────────────── */
+  --sidebar-w: 260px;
+  --header-h: 60px;
+  --content-max: 1200px;
+}
+
+/* Dark mode — tự động theo hệ điều hành */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --clr-gray-100: #1a1a2e;
+    --clr-gray-200: #16213e;
+    --clr-white: #0f3460;
+    --clr-dark: #e9ecef;
+  }
+}
