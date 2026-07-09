@@ -1,0 +1,19 @@
+# ── Frontend ──────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.production
+# ── Backend ───────────────────────────────────────
+backend/config/database.php # Không commit thông tin kết nối thật
+backend/uploads/* 
+!backend/uploads/.gitkeep
+# ── Hệ điều hành ──────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+# ── Editor ────────────────────────────────────────
+.vscode/launch.json
+*.swp
+# ── Log files ──────────────────────────────────────
+*.log
+npm-debug.log*
