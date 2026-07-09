@@ -1,0 +1,12 @@
+RewriteEngine On
+Options -Indexes # Tắt directory listing (bảo mật)
+# Nếu là file/thư mục thật → phục vụ trực tiếp (ảnh, file upload)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+# Mọi request khác → vào index.php
+RewriteRule ^(.*)$ index.php [QSA,L]
+# Bảo vệ thư mục config
+<FilesMatch "^database\.php$">
+Order Deny,Allow
+Deny from all
+</FilesMatch>
