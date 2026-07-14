@@ -102,13 +102,6 @@ Xoá session hiện tại. Response `200`, `data: null`.
 ### 1.3. `GET /api/auth/me`
 Lấy thông tin user đang đăng nhập.
 
-### 1.4. `PUT /api/auth/change-password`
-Đổi mật khẩu.
-Request: `{ "old_password": "Test1234", "new_password": "NewPass2025" }`
-Response `200`: `{ "success": true, "message": "Đổi mật khẩu thành công", "data": null }`
-
----
-
 ## 2. Module Quản lý Người dùng (chỉ `admin`)
 
 ### 2.1. `GET /api/users?page=1&per_page=10&search=&role=`
@@ -125,7 +118,7 @@ Xoá mềm (đổi `status = inactive`).
 
 ---
 
-## 3. Module Quản lý Danh mục (`admin`, `thu_kho`)
+## 3. Module Quản lý Danh mục (`admin`, `user`)
 
 ### 3.1. Sản phẩm — `/api/items`
 | Method | Path | Mô tả |
