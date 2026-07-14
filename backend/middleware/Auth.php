@@ -23,7 +23,6 @@ class Auth {
         return [
             "id" => (int)($_SESSION["user_id"] ?? 0),
             "name" => $_SESSION["user_name"] ?? "",
-            "email" => $_SESSION["user_email"] ?? "",
             "role" => $_SESSION["user_role"] ?? "",
         ];
     }

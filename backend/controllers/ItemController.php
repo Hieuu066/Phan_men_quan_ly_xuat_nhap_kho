@@ -1,16 +1,17 @@
 <?php
+// backend/controllers/ItemController.php
 class ItemController {
-    private const TABLE = "items"; // ← Đổi tên bảng
+    private const TABLE = "san_pham"; // ← Đổi tên bảng
     private const PER_PAGE = 10; // Số bản ghi mỗi trang
     /**
-    * GET /api/items?page=1&limit=10&q=keyword&status=active&sort=created_at&order=desc
+    * GET /api/items?page=1&per_page=10&search=keyword&status=active&sort=created_at&order=desc
     * Danh sách có tìm kiếm, lọc, sắp xếp và phân trang
     */
     public static function index(): void {
         Auth::required();
         $page = max(1, (int)($_GET["page"] ?? 1));
-        $limit = max(1, min(100, (int)($_GET["limit"] ?? self::PER_PAGE)));
-        $q = trim($_GET["q"] ?? ""); // Từ khóa tìm kiếm
+        $limit = max(1, min(100, (int)($_GET["per_page"] ?? self::PER_PAGE)));
+        $q = trim($_GET["search"] ?? ""); // Từ khóa tìm kiếm
         $status = trim($_GET["status"] ?? ""); // Lọc theo trạng thái
         $sort = in_array($_GET["sort"] ?? "", [
             "id","name","created_at","updated_at"

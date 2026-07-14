@@ -1,73 +1,49 @@
 <?php
+// backend/controllers/AuthController.php
 class AuthController {
-    public static function register(array $body): void {
-        // 1. Lấy và làm sạch dữ liệu
-        $name = trim($body["name"] ?? "");
-        $email = strtolower(trim($body["email"] ?? ""));
-        $password = $body["password"] ?? "";
-        $role = in_array($body["role"] ?? "", ["admin","teacher","student","user"])
-        ? $body["role"] : "user";
-
-        // 2. Validate
-        $errors = [];
-        if (mb_strlen($name) < 2) $errors[] = "Ho ten phai co it nhat 2 ky tu.";
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Email khong hop le.";
-        if (strlen($password) < 8) $errors[] = "Mat khau phai co it nhat 8 ky tu.";
-        if (!preg_match("/[A-Z]/", $password)) $errors[] = "Mat khau phai co chu hoa.";
-        if (!preg_match("/[0-9]/", $password)) $errors[] = "Mat khau phai co chu so.";
-        if ($errors) Response::err(implode(" ", $errors));
-
-        $db = getDB();
-        // 3. Kiểm tra email trùng
-        $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->fetch()) Response::err("Email nay da duoc su dung.", 409);
-        // 4. Mã hóa mật khẩu bcrypt (cost=12 — đủ mạnh, không quá chậm)
-        $hash = password_hash($password, PASSWORD_BCRYPT, ["cost" => 12]);
-        // 5. Lưu vào CSDL
-        $stmt = $db->prepare(
-            "INSERT INTO users (name,email,password,role) VALUES (?,?,?,?)"
-        );
-        $stmt->execute([$name, $email, $hash, $role]);
-        $id = (int)$db->lastInsertId();
-        Response::ok(["id"=>$id,"name"=>$name,"email"=>$email,"role"=>$role], "Dang ky thanh cong!");
-    }
+    // Xuất nhập kho nội bộ sẽ không cho phép tự ý đăng kí tài khoản
+    // public static function register(array $body): void { }
 
     public static function login(array $body): void {
-        $email = strtolower(trim($body["email"] ?? ""));
+        // echo password_hash("Test1234", PASSWORD_BCRYPT, ["cost" => 12]);
+        $username = strtolower(trim($body["username"] ?? ""));
         $password = $body["password"] ?? "";
-        if (!$email || !$password) Response::err("Vui long nhap email va mat khau.");
+        if (!$username || !$password) Response::err("Vui long nhap ten dang nhap va mat khau.");
         $db = getDB();
-        $stmt = $db->prepare("SELECT * FROM users WHERE email = ? AND
-        is_active = 1");
-        $stmt->execute([$email]);
+        $stmt = $db->prepare("SELECT * FROM users WHERE username = ?");
+        $stmt->execute([$username]);
         $user = $stmt->fetch();
         // Dùng password_verify — tự động xử lý timing attack
         if (!$user || !password_verify($password, $user["password"])) {
-            Response::err("Email hoac mat khau khong dung.", 401);
+            Response::err("Ten dang nhap hoac mat khau khong dung.", 401);
         }
         // Nếu hash cũ (cost thấp) → tự động nâng cấp hash
         if (password_needs_rehash($user["password"], PASSWORD_BCRYPT, ["cost"=>12])) {
             $newHash = password_hash($password, PASSWORD_BCRYPT, ["cost"=>12]);
             $db->prepare("UPDATE users SET password=? WHERE id=?")->execute([$newHash,$user["id"]]);
         }
+        // Kiểm tra trạng thái tài khoản(status)
+        if ($user["status"] === 'inactive') {
+            Response::err("Tài khoản của bạn đã bị vô hiệu hóa, liên hệ quản trị viên.", 403);
+        }
         // Tái tạo session ID — ngăn Session Fixation Attack
         session_regenerate_id(true);
         // Lưu vào session
         $_SESSION["user_id"] = $user["id"];
-        $_SESSION["user_name"] = $user["name"];
-        $_SESSION["user_email"] = $user["email"];
+        $_SESSION["user_name"] = $user["username"];
         $_SESSION["user_role"] = $user["role"];
         // Cập nhật thời điểm đăng nhập cuối
-        $db->prepare("UPDATE users SET last_login=NOW() WHERE id=?")->execute([$user["id"]]);
+        // $db->prepare("UPDATE users SET last_login=NOW() WHERE id=?")->execute([$user["id"]]);
         Response::ok([
-            "id"=>$user["id"], "name"=>$user["name"],
-            "email"=>$user["email"], "role"=>$user["role"],
-            "avatar"=>$user["avatar"],
+            "id" => $user["id"],
+            "username" => $user["username"],
+            "full_name" => $user["full_name"],
+            "role" => $user["role"]
         ], "Dang nhap thanh cong!");
     }
     public static function logout(): void {
-        session_unset(); session_destroy();
+        session_unset(); 
+        session_destroy();
         Response::ok(null, "Da dang xuat.");
     }
     public static function me(): void {
