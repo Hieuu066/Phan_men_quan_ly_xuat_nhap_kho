@@ -2,9 +2,9 @@
 class Auth {
     /** Bắt buộc đăng nhập — trả về 401 nếu chưa có session */
     public static function required(): void {
-    if (empty($_SESSION["user_id"])) {
-        Response::err("Phien lam viec het han. Vui long dang nhap lai.", 401);
-    }
+        if (empty($_SESSION["user_id"])) {
+            Response::err("Phien lam viec het han. Vui long dang nhap lai.", 401);
+        }
     }
 
     /**

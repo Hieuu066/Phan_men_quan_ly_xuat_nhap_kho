@@ -50,33 +50,22 @@ class AuthController {
         Auth::required();
         $db = getDB();
         $stmt = $db->prepare(
-            "SELECT id,name,email,role,avatar,phone,created_at FROM users WHERE id=?"
+            "SELECT id,username,full_name,role,created_at FROM users WHERE id=?"
         );
         $stmt->execute([$_SESSION["user_id"]]);
         $user = $stmt->fetch();
         if (!$user) Response::err("Khong tim thay nguoi dung.", 404);
         Response::ok($user);
     }
-    public static function updateProfile(array $body): void {
-        Auth::required();
-        $name = trim($body["name"] ?? "");
-        $phone = trim($body["phone"] ?? "");
-        if (mb_strlen($name) < 2) Response::err("Ho ten phai co it nhat 2 ky tu.");
-        $db = getDB();
-        // Xử lý upload avatar nếu có
-        $avatarPath = null;
-        if (!empty($_FILES["avatar"]["name"])) {
-            try {
-            require_once __DIR__ . "/../utils/FileUpload.php";
-            $avatarPath = FileUpload::image($_FILES["avatar"], "avatars");
-            } catch (RuntimeException $e) {
-                Response::err($e->getMessage());
-            }
-        }
-        $sql = "UPDATE users SET name=?, phone=?" . ($avatarPath ? ", avatar=?" : "") . " WHERE id=?";
-        $prm = $avatarPath ? [$name,$phone,$avatarPath,$_SESSION["user_id"]] : [$name,$phone,$_SESSION["user_id"]];
-        $db->prepare($sql)->execute($prm);
-        $_SESSION["user_name"] = $name;
-        Response::ok(null, "Cap nhat ho so thanh cong!");
-    }
+    // public static function updateProfile(array $body): void {
+    //     Auth::required();
+    //     $name = trim($body["name"] ?? "");
+    //     if (mb_strlen($name) < 2) Response::err("Ho ten phai co it nhat 2 ky tu.");
+    //     $db = getDB();
+    //     $sql = "UPDATE users SET name=?, " WHERE id=?";
+    //     $prm = $avatarPath ? [$name,$phone,$avatarPath,$_SESSION["user_id"]] : [$name,$phone,$_SESSION["user_id"]];
+    //     $db->prepare($sql)->execute($prm);
+    //     $_SESSION["user_name"] = $name;
+    //     Response::ok(null, "Cap nhat ho so thanh cong!");
+    // }
 }

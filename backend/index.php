@@ -62,13 +62,30 @@ switch ($segment) {
     case "auth":
         require_once __DIR__ . "/controllers/AuthController.php";
         match ("$method:$action") {
-            "POST:register" => AuthController::register($body),
+            // "POST:register" => AuthController::register($body),
             "POST:login" => AuthController::login($body),
             "POST:logout" => AuthController::logout(),
             "GET:me" => AuthController::me(),
             "PUT:profile" => AuthController::updateProfile($body),
             default => Response::err("Endpoint khong ton tai.", 404),
         };
+        break;
+    case "users":
+        require_once __DIR__ . "/controllers/UserController.php";
+        if ($id !== null) {
+            match ($method) {
+                "GET" => UserController::show($id),
+                "PUT" => UserController::update($id, $body),
+                "DELETE" => UserController::destroy($id),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        } else {
+            match ($method) {
+                "GET" => UserController::index(), // Xử lý GET /api/users
+                "POST" => UserController::store($body),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        }
         break;
     case "items":
         require_once __DIR__ . "/controllers/ItemController.php";
