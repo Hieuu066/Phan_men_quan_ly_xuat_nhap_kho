@@ -1,3 +1,21 @@
+<<<<<<< HEAD
+# React + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+=======
 # 📦 Phần mềm Quản lý Xuất Nhập Kho
 
 > Nhánh hiện tại: `develop` — bộ khung (skeleton) khởi tạo cho dự án Full-stack: **React (Vite)** ở Front-end và **PHP thuần (vanilla)** ở Back-end, kết nối **MySQL**.
@@ -137,3 +155,4 @@ Dưới đây là các phần cần hoàn thiện (đã được tinh gọn đ�
 - **Router & Auth**: Hoàn thiện luồng đăng nhập, gán token/session và bảo vệ các route private.
 - **Trang Dashboard**: Xây dựng 1 biểu đồ cột (tổng số lượng nhập/xuất theo tháng) và 3-4 thẻ thống kê số liệu tổng. Không vẽ các biểu đồ phức tạp.
 - **Tính năng xuất báo cáo**: Chỉ cần lập bảng hiển thị trên web + tính năng lọc theo khoảng thời gian (Từ ngày - Đến ngày). KHÔNG code chức năng xuất Excel/PDF.
+>>>>>>> cddf4a6a38642c35c2e27a0734f6962f51b5de56
