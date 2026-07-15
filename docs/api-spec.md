@@ -121,13 +121,14 @@ Xoá mềm (đổi `status = inactive`).
 ## 3. Module Quản lý Danh mục (`admin`, `user`)
 
 ### 3.1. Sản phẩm — `/api/items`
-| Method | Path | Mô tả |
-|---|---|---|
-| GET | `/api/items?page=&per_page=&search=&category=` | Danh sách, tìm kiếm, phân trang |
-| GET | `/api/items/{id}` | Chi tiết 1 sản phẩm |
-| POST | `/api/items` | Tạo mới |
-| PUT | `/api/items/{id}` | Cập nhật |
-| DELETE | `/api/items/{id}` | Xoá (chặn nếu đã phát sinh giao dịch — trả `409`) |
+| Method |                Path                            |            Mô tả               |
+|--------|------------------------------------------------|--------------------------------|
+| GET    |
+ `/api/items?page=&per_page=&search=&category=` | Danh sách, tìm kiếm, phân trang|
+| GET    | `/api/items/{id}`                              | Chi tiết 1 sản phẩm            |
+| POST   | `/api/items`                                   | Tạo mới                        |
+| PUT    | `/api/items/{id}`                              | Cập nhật                       |
+| DELETE | `/api/items/{id}`                              | Xoá (chặn nếu đã phát sinh giao dịch — trả `409`) |
 
 Ví dụ 1 sản phẩm (`data`):
 ```json

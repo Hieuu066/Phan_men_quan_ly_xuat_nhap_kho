@@ -27,12 +27,12 @@ class Pagination {
         $offset = ($page - 1) * $limit;
         
         // 3. Lấy dữ liệu trang hiện tại
-        $stmt = $db->prepare("{$baseSQL} LIMIT :lmt OFFSET :ofs");
+        $stmt = $db->prepare("{$baseSQL} LIMIT {$limit} OFFSET {$offset}");
         foreach ($params as $k => $v) {
         $stmt->bindValue(is_int($k) ? $k + 1 : $k, $v);
         }
-        $stmt->bindValue(":lmt", $limit, PDO::PARAM_INT);
-        $stmt->bindValue(":ofs", $offset, PDO::PARAM_INT);
+        // $stmt->bindValue(":lmt", $limit, PDO::PARAM_INT);
+        // $stmt->bindValue(":ofs", $offset, PDO::PARAM_INT);
         $stmt->execute();
         $data = $stmt->fetchAll();
 
