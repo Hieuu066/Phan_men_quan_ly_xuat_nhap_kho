@@ -17,7 +17,7 @@ function Products({ products, setProducts, warehouses }) {
 
   const handleAdd = (e) => {
     e.preventDefault();
-    if (products.some(p => p.id === id)) return alert('Mã vật tư này đã tồn tại!');
+    if (products.some(p => p.id === id)) return alert('Mã linh kiện này đã tồn tại!');
 
     const newProduct = {
       id,
@@ -29,11 +29,11 @@ function Products({ products, setProducts, warehouses }) {
 
     setProducts([...products, newProduct]);
     setId(''); setName(''); setCategory(''); setWarehouseId(''); setQuantity('');
-    alert('Khởi tạo mã danh mục vật tư mới thành công!');
+    alert('Thêm linh kiện mới vào kho thành công!');
   };
 
   const handleDelete = (prodId) => {
-    if (window.confirm(`Xác nhận xóa vĩnh viễn sản phẩm ${prodId} khỏi hệ thống?`)) {
+    if (window.confirm(`Xác nhận xóa mã linh kiện ${prodId} khỏi hệ thống quản lý?`)) {
       setProducts(products.filter(p => p.id !== prodId));
     }
   };
@@ -55,44 +55,44 @@ function Products({ products, setProducts, warehouses }) {
     });
     setProducts(updated);
     setEditingId(null);
-    alert('Cập nhật dữ liệu chứng từ gốc thành công!');
+    alert('Cập nhật thông tin linh kiện thành công!');
   };
 
   return (
     <div>
-      <h2>📦 QUẢN LÝ DANH MỤC VẬT TƯ & HÀNG HÓA TỒN KHO</h2>
+      <h2>📦 QUẢN LÝ DANH MỤC LINH KIỆN MÁY TÍNH & ĐIỆN TỬ</h2>
 
       {/* FORM KHỞI TẠO VẬT TƯ MỚI */}
       <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '25px' }}>
-        <h3 style={{ marginTop: 0 }}>➕ Đăng ký danh mục sản phẩm mới</h3>
+        <h3 style={{ marginTop: 0 }}>➕ Khai báo thêm mã linh kiện mới</h3>
         <form onSubmit={handleAdd} style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-          <input type="text" placeholder="Mã Vật Tư (Ví dụ: SP005)" value={id} onChange={(e) => setId(e.target.value)} required style={{ padding: '8px', flex: 1 }} />
-          <input type="text" placeholder="Tên sản phẩm thiết bị" value={name} onChange={(e) => setName(e.target.value)} required style={{ padding: '8px', flex: 2 }} />
-          <input type="text" placeholder="Phân nhóm danh mục" value={category} onChange={(e) => setCategory(e.target.value)} required style={{ padding: '8px', flex: 1 }} />
+          <input type="text" placeholder="Mã Linh Kiện (Ví dụ: RAM004)" value={id} onChange={(e) => setId(e.target.value)} required style={{ padding: '8px', flex: 1 }} />
+          <input type="text" placeholder="Tên chi tiết linh kiện" value={name} onChange={(e) => setName(e.target.value)} required style={{ padding: '8px', flex: 2 }} />
+          <input type="text" placeholder="Phân loại (CPU/RAM/VGA...)" value={category} onChange={(e) => setCategory(e.target.value)} required style={{ padding: '8px', flex: 1 }} />
           
           <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} required style={{ padding: '8px', flex: 1 }}>
-            <option value="">-- Chỉ định lưu kho --</option>
+            <option value="">-- Chọn kho lưu trữ --</option>
             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
           
-          <input type="number" placeholder="Số lượng khởi tạo ban đầu" value={quantity} onChange={(e) => setQuantity(e.target.value)} min="0" required style={{ padding: '8px', flex: 1 }} />
+          <input type="number" placeholder="Số lượng nhập kho ban đầu" value={quantity} onChange={(e) => setQuantity(e.target.value)} min="0" required style={{ padding: '8px', flex: 1 }} />
           
-          <button type="submit" style={{ padding: '8px 20px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Thêm Mới</button>
+          <button type="submit" style={{ padding: '8px 20px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Thêm Mới</button>
         </form>
       </div>
 
       {/* BẢNG CHỨA CÁC THAO TÁC CRUD */}
       <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-        <h3>📦 Dữ liệu tổng hợp cấu trúc sản phẩm</h3>
+        <h3>📦 Cơ Sở Dữ Liệu Tồn Kho Toàn Hệ Thống</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
-            <tr style={{ backgroundColor: '#34495e', color: 'white' }}>
-              <th style={{ padding: '12px' }}>Mã Vật Tư</th>
-              <th style={{ padding: '12px' }}>Tên Sản Phẩm Vật Tư</th>
-              <th style={{ padding: '12px' }}>Danh Mục Gốc</th>
-              <th style={{ padding: '12px' }}>Vị Trí Kho Chỉ Định</th>
-              <th style={{ padding: '12px' }}>Số Lượng Tồn</th>
-              <th style={{ padding: '12px' }}>Hành Động Hệ Thống</th>
+            <tr style={{ backgroundColor: '#2c3e50', color: 'white' }}>
+              <th style={{ padding: '12px' }}>Mã Linh Kiện</th>
+              <th style={{ padding: '12px' }}>Tên Linh Kiện</th>
+              <th style={{ padding: '12px' }}>Phân Loại</th>
+              <th style={{ padding: '12px' }}>Kho Chỉ Định</th>
+              <th style={{ padding: '12px' }}>Số Tồn</th>
+              <th style={{ padding: '12px' }}>Hành Động</th>
             </tr>
           </thead>
           <tbody>
