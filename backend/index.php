@@ -106,12 +106,20 @@ switch ($segment) {
             };
         }
         break;
-    case "stats":
-        require_once __DIR__ . "/controllers/StatsController.php";
-        match ("$method:$action") {
-            "GET:summary" => StatsController::summary(),
-            default => Response::err("Endpoint thong ke khong ton tai.", 404),
-        };
+    case 'stats':
+        if ($method === 'GET' && $uri === 'summary') {
+            require_once __DIR__ . '/controllers/ReportController.php';
+            ReportController::summary();
+        }
+        break;
+
+    case 'reports':
+        require_once __DIR__ . '/controllers/ReportController.php';
+        if ($method === 'GET' && $uri === 'low-stock') {
+            ReportController::lowStock();
+        } elseif ($method === 'GET' && $uri === 'inventory') {
+            ReportController::inventory();
+        }
         break;
     case "suppliers":
         require_once __DIR__ . '/controllers/SupplierController.php';
