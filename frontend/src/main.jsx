@@ -1,14 +1,9 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import { AuthProvider } from "./contexts/AuthContext";
-import "./styles/global.css";
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App.jsx'
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <BrowserRouter>
-    <AuthProvider>
-      <Dashboard />
-    </AuthProvider>
-  </BrowserRouter>
-);
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
