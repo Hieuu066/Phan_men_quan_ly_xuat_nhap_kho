@@ -66,14 +66,14 @@ CREATE TABLE phieu_nhap (
 CREATE TABLE chi_tiet_phieu_nhap (
     id INT AUTO_INCREMENT PRIMARY KEY,
     phieu_nhap_id INT NOT NULL,
-    san_pham_id INT NOT NULL,
+    product_id INT NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0),
     unit_price BIGINT NOT NULL COMMENT 'Giá nhập tại thời điểm đó - không lấy trực tiếp từ san_pham.price vì giá có thể đổi về sau' CHECK (unit_price >= 0),
     line_total BIGINT GENERATED ALWAYS AS (quantity * unit_price) STORED,
     INDEX idx_ctpn_phieu (phieu_nhap_id),
-    INDEX idx_ctpn_sanpham (san_pham_id),
+    INDEX idx_ctpn_sanpham (product_id),
     FOREIGN KEY (phieu_nhap_id) REFERENCES phieu_nhap(id),
-    FOREIGN KEY (san_pham_id) REFERENCES san_pham(id)
+    FOREIGN KEY (product_id) REFERENCES san_pham(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ================================================================
@@ -97,14 +97,14 @@ CREATE TABLE phieu_xuat (
 CREATE TABLE chi_tiet_phieu_xuat (
     id INT AUTO_INCREMENT PRIMARY KEY,
     phieu_xuat_id INT NOT NULL,
-    san_pham_id INT NOT NULL,
+    product_id INT NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0),
     unit_price BIGINT NOT NULL CHECK (unit_price >= 0),
     line_total BIGINT GENERATED ALWAYS AS (quantity * unit_price) STORED,
     INDEX idx_ctpx_phieu (phieu_xuat_id),
-    INDEX idx_ctpx_sanpham (san_pham_id),
+    INDEX idx_ctpx_sanpham (product_id),
     FOREIGN KEY (phieu_xuat_id) REFERENCES phieu_xuat(id),
-    FOREIGN KEY (san_pham_id) REFERENCES san_pham(id)
+    FOREIGN KEY (product_id) REFERENCES san_pham(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ================================================================
@@ -118,7 +118,7 @@ FOR EACH ROW
 BEGIN
     UPDATE san_pham
     SET quantity_on_hand = quantity_on_hand + NEW.quantity
-    WHERE id = NEW.san_pham_id;
+    WHERE id = NEW.product_id;
 
     UPDATE phieu_nhap
     SET total_amount = total_amount + NEW.line_total
@@ -138,7 +138,7 @@ BEGIN
     DECLARE thong_bao VARCHAR(255);
 
     SELECT quantity_on_hand, name INTO ton_hien_tai, ten_sp
-    FROM san_pham WHERE id = NEW.san_pham_id
+    FROM san_pham WHERE id = NEW.product_id
     FOR UPDATE;
 
     IF ton_hien_tai IS NULL THEN
@@ -162,7 +162,7 @@ FOR EACH ROW
 BEGIN
     UPDATE san_pham
     SET quantity_on_hand = quantity_on_hand - NEW.quantity
-    WHERE id = NEW.san_pham_id;
+    WHERE id = NEW.product_id;
 
     UPDATE phieu_xuat
     SET total_amount = total_amount + NEW.line_total

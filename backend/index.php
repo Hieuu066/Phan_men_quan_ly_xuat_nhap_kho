@@ -113,6 +113,52 @@ switch ($segment) {
             default => Response::err("Endpoint thong ke khong ton tai.", 404),
         };
         break;
+    case "suppliers":
+        require_once __DIR__ . '/controllers/SupplierController.php';
+        if (!$id) {
+            match ($method) {
+                "GET" => SupplierController::index(),
+                "POST" => SupplierController::store($body),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        } else {
+            match ($method) {
+                "GET" => SupplierController::show($id),
+                "PUT" => SupplierController::update($id, $body),
+                "DELETE" => SupplierController::destroy($id),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        }
+        break;
+    case "import-orders":
+        require_once __DIR__ . '/controllers/ImportOrderController.php';
+        if (!$id) {
+            match ($method) {
+                "GET" => ImportOrderController::index(),
+                "POST" => ImportOrderController::store($body),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        } else {
+            match ($method) {
+                "GET" => ImportOrderController::show($id),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        }
+    case "export-orders":
+        require_once __DIR__ . '/controllers/ExportOrderController.php';
+        if (!$id) {
+            match ($method) {
+                "GET" => ExportOrderController::index(),
+                "POST" => ExportOrderController::store($body),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        } else {
+            match ($method) {
+                "GET" => ExportOrderController::show($id),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        }
+        break;
     // ── THÊM RESOURCE MỚI Ở ĐÂY (copy pattern của "items") ──
     default:
         Response::err("API endpoint [{$method} /api/{$segment}] khong ton tai.", 404);
