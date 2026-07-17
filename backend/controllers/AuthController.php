@@ -57,15 +57,33 @@ class AuthController {
         if (!$user) Response::err("Khong tim thay nguoi dung.", 404);
         Response::ok($user);
     }
-    // public static function updateProfile(array $body): void {
-    //     Auth::required();
-    //     $name = trim($body["name"] ?? "");
-    //     if (mb_strlen($name) < 2) Response::err("Ho ten phai co it nhat 2 ky tu.");
-    //     $db = getDB();
-    //     $sql = "UPDATE users SET name=?, " WHERE id=?";
-    //     $prm = $avatarPath ? [$name,$phone,$avatarPath,$_SESSION["user_id"]] : [$name,$phone,$_SESSION["user_id"]];
-    //     $db->prepare($sql)->execute($prm);
-    //     $_SESSION["user_name"] = $name;
-    //     Response::ok(null, "Cap nhat ho so thanh cong!");
-    // }
+    public static function updateProfile(array $body): void {
+        Auth::required();
+        $fullName = trim($body["full_name"] ?? "");
+        $password = $body["password"] ?? "";
+
+        if (mb_strlen($fullName) < 2) {
+            Response::err("Ho ten phai co it nhat 2 ky tu.", 400);
+        }
+
+        $db = getDB();
+        $fields = ["full_name = ?"];
+        $params = [$fullName];
+
+        // Chỉ đổi mật khẩu nếu người dùng thực sự nhập mật khẩu mới
+        if ($password !== "") {
+            if (strlen($password) < 8) {
+                Response::err("Mat khau moi phai co it nhat 8 ky tu.", 400);
+            }
+            $fields[] = "password = ?";
+            $params[] = password_hash($password, PASSWORD_BCRYPT, ["cost" => 12]);
+        }
+
+        $params[] = $_SESSION["user_id"];
+        $sql = "UPDATE users SET " . implode(", ", $fields) . " WHERE id = ?";
+        $db->prepare($sql)->execute($params);
+
+        $_SESSION["user_name"] = $fullName;
+        Response::ok(null, "Cap nhat ho so thanh cong!");
+    }
 }

@@ -23,7 +23,7 @@ class UserController {
             $params = [];
 
             if ($search !== '') {
-                $whereClause .= " AND (username LIKE :search OR fullname LIKE :search)";
+                $whereClause .= " AND (username LIKE :search OR full_name LIKE :search)";
                 $params[':search'] = "%{$search}%";
             }
 
@@ -68,7 +68,26 @@ class UserController {
             Response::paged($users, $meta);
 
         } catch (PDOException $e) {
-            Response::err("Lỗi: " . $e->getMessage(), 500);
+            Response::err("Không thể lấy danh sách người dùng. Vui lòng thử lại.", 500);
+        }
+    }
+
+    // Xử lý GET /api/users/{id}
+    public static function show($id) {
+        Auth::role("admin");
+        $db = getDB();
+        try {
+            $stmt = $db->prepare("SELECT id, username, full_name, role, status, created_at, updated_at FROM users WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                Response::err("Không tìm thấy người dùng.", 404);
+            }
+
+            Response::ok($user, "Lay thong tin nguoi dung thanh cong.");
+        } catch (PDOException $e) {
+            Response::err("Không thể lấy thông tin người dùng. Vui lòng thử lại.", 500);
         }
     }
 
@@ -137,7 +156,7 @@ class UserController {
             exit;
 
         } catch (PDOException $e) {
-            Response::err("Lỗi máy chủ: " . $e->getMessage(), 500);
+            Response::err("Đã xảy ra lỗi. Vui lòng thử lại.", 500);
         }
     }
 
@@ -211,7 +230,7 @@ class UserController {
             exit;
 
         } catch (PDOException $e) {
-            Response::err("Lỗi máy chủ: " . $e->getMessage(), 500);
+            Response::err("Đã xảy ra lỗi. Vui lòng thử lại.", 500);
         }
     }
 
@@ -255,7 +274,7 @@ class UserController {
             exit;
 
         } catch (PDOException $e) {
-            Response::err("Lỗi máy chủ: " . $e->getMessage(), 500);
+            Response::err("Đã xảy ra lỗi. Vui lòng thử lại.", 500);
         }
     }
 }

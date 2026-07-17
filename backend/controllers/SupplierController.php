@@ -59,7 +59,7 @@ class SupplierController {
         $supplier = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$supplier) {
-            Response::err(404, "Không tìm thấy nhà cung cấp");
+            Response::err("Không tìm thấy nhà cung cấp", 404);
         }
         
         Response::ok($supplier);
@@ -71,7 +71,7 @@ class SupplierController {
         
         // Validate
         if (empty($body['name'])) {
-            Response::err(400, "Vui lòng nhập tên nhà cung cấp");
+            Response::err("Vui lòng nhập tên nhà cung cấp", 400);
         }
         
         $phone = $body['phone'] ?? null;
@@ -82,9 +82,10 @@ class SupplierController {
         
         try {
             $stmt->execute([$body['name'], $phone, $email, $address]);
-            Response::ok(null, "Tạo nhà cung cấp thành công", 201);
+            http_response_code(201);
+            Response::ok(null, "Tạo nhà cung cấp thành công");
         } catch (PDOException $e) {
-            Response::err(500, "Lỗi server: " . $e->getMessage());
+            Response::err("Không thể tạo nhà cung cấp. Vui lòng thử lại.", 500);
         }
     }
 
@@ -93,7 +94,7 @@ class SupplierController {
         $db = getDB();
         
         if (empty($body['name'])) {
-            Response::err(400, "Tên nhà cung cấp không được để trống");
+            Response::err("Tên nhà cung cấp không được để trống", 400);
         }
         
         $phone = $body['phone'] ?? null;
@@ -109,7 +110,7 @@ class SupplierController {
             $check = $db->prepare("SELECT id FROM " . self::TABLE . " WHERE id = ?");
             $check->execute([$id]);
             if (!$check->fetch()) {
-                Response::err(404, "Không tìm thấy nhà cung cấp");
+                Response::err("Không tìm thấy nhà cung cấp", 404);
             }
         }
         
@@ -130,7 +131,7 @@ class SupplierController {
             $supplier = $check->fetch();
             
             if (!$supplier) {
-                Response::err(404, "Không tìm thấy nhà cung cấp");
+                Response::err("Không tìm thấy nhà cung cấp", 404);
             }
             if ($supplier['status'] === 'inactive') {
                 Response::err("Nhà cung cấp này đã bị vô hiệu hoá từ trước", 400);

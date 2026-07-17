@@ -107,7 +107,7 @@ switch ($segment) {
         }
         break;
     case 'stats':
-        if ($method === 'GET' && $uri === 'summary') {
+        if ($method === 'GET' && $action === 'summary') {
             require_once __DIR__ . '/controllers/ReportController.php';
             ReportController::summary();
         }
@@ -115,9 +115,9 @@ switch ($segment) {
 
     case 'reports':
         require_once __DIR__ . '/controllers/ReportController.php';
-        if ($method === 'GET' && $uri === 'low-stock') {
+        if ($method === 'GET' && $action === 'low-stock') {
             ReportController::lowStock();
-        } elseif ($method === 'GET' && $uri === 'inventory') {
+        } elseif ($method === 'GET' && $action === 'inventory') {
             ReportController::inventory();
         }
         break;
@@ -152,6 +152,7 @@ switch ($segment) {
                 default => Response::err("Method khong hop le.", 405),
             };
         }
+        break;
     case "export-orders":
         require_once __DIR__ . '/controllers/ExportOrderController.php';
         if (!$id) {
