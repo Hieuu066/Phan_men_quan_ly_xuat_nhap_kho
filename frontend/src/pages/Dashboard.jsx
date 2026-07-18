@@ -1,12 +1,65 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { reportService } from "../services/report.service";
+import { productService } from "../services/product.service";
+import { orderService } from "../services/order.service";
 
-function Dashboard({ products, warehouses, transactions }) {
-  const totalItems = products.length;
-  const lowStockItems = products.filter(
-    (p) => p.quantity > 0 && p.quantity < 20,
-  ).length; // Linh kiện điện tử dưới 20 là thấp
-  const outOfStockItems = products.filter((p) => p.quantity === 0).length;
-  const totalMovements = transactions.length;
+function Dashboard() {
+  const [summary, setSummary] = useState(null);
+  const [lowStockList, setLowStockList] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [totalMovements, setTotalMovements] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const [summaryRes, lowStockRes, productsRes, importRes, exportRes] =
+          await Promise.all([
+            reportService.getSummary(),
+            reportService.getLowStock(),
+            productService.getAll({ per_page: 100 }),
+            orderService.getImportOrders({ per_page: 1 }),
+            orderService.getExportOrders({ per_page: 1 }),
+          ]);
+        if (cancelled) return;
+        if (summaryRes.success) setSummary(summaryRes.data);
+        if (lowStockRes.success) setLowStockList(lowStockRes.data);
+        if (productsRes.success) setProducts(productsRes.data);
+        setTotalMovements(
+          (importRes.meta?.total || 0) + (exportRes.meta?.total || 0),
+        );
+      } catch (err) {
+        if (!cancelled)
+          setError(
+            err.response?.data?.message || "Không thể tải dữ liệu Dashboard.",
+          );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading)
+    return (
+      <div style={{ padding: 40, textAlign: "center" }}>
+        Đang tải dữ liệu...
+      </div>
+    );
+  if (error)
+    return <div style={{ padding: 20, color: "#e74c3c" }}>{error}</div>;
+
+  const outOfStockCount = lowStockList.filter(
+    (p) => Number(p.quantity_on_hand) === 0,
+  ).length;
+  const lowStockCount = lowStockList.length - outOfStockCount;
 
   return (
     <div>
@@ -28,7 +81,7 @@ function Dashboard({ products, warehouses, transactions }) {
         </span>
       </div>
 
-      {/* THẺ CHỈ SỐ KPA */}
+      {/* THẺ CHỈ SỐ KPI */}
       <div style={{ display: "flex", gap: "20px", marginBottom: "30px" }}>
         <div
           style={{
@@ -58,7 +111,7 @@ function Dashboard({ products, warehouses, transactions }) {
               color: "#2c3e50",
             }}
           >
-            {totalItems}{" "}
+            {summary?.total_products ?? 0}{" "}
             <span style={{ fontSize: "14px", color: "#7f8c8d" }}>Mẫu mã</span>
           </p>
         </div>
@@ -80,7 +133,7 @@ function Dashboard({ products, warehouses, transactions }) {
               fontSize: "11px",
             }}
           >
-            Sắp cháy hàng (&lt;20 chiếc)
+            Sắp cháy hàng (dưới định mức)
           </h4>
           <p
             style={{
@@ -90,7 +143,7 @@ function Dashboard({ products, warehouses, transactions }) {
               color: "#f1c40f",
             }}
           >
-            {lowStockItems}{" "}
+            {lowStockCount}{" "}
             <span style={{ fontSize: "14px", color: "#7f8c8d" }}>
               Linh kiện
             </span>
@@ -124,7 +177,7 @@ function Dashboard({ products, warehouses, transactions }) {
               color: "#e74c3c",
             }}
           >
-            {outOfStockItems}{" "}
+            {outOfStockCount}{" "}
             <span style={{ fontSize: "14px", color: "#7f8c8d" }}>
               Chủng loại
             </span>
@@ -190,25 +243,24 @@ function Dashboard({ products, warehouses, transactions }) {
                 borderBottom: "2px solid #dee2e6",
               }}
             >
-              <th style={{ padding: "12px" }}>Mã hàng</th>
+              <th style={{ padding: "12px" }}>Mã hàng (SKU)</th>
               <th style={{ padding: "12px" }}>Tên linh kiện điện tử</th>
               <th style={{ padding: "12px" }}>Nhóm sản phẩm</th>
-              <th style={{ padding: "12px" }}>Vị trí lưu kho</th>
+              <th style={{ padding: "12px" }}>Nhà cung cấp</th>
               <th style={{ padding: "12px" }}>Số lượng còn lại</th>
               <th style={{ padding: "12px" }}>Trạng thái phân phối</th>
             </tr>
           </thead>
           <tbody>
             {products.map((item) => {
-              const whName =
-                warehouses.find((w) => w.id === item.warehouse_id)?.name ||
-                "Chưa định vị kho";
+              const qty = Number(item.quantity_on_hand);
+              const minStock = Number(item.min_stock);
               let statusText = "Đủ hàng bán";
               let statusColor = "#2ecc71";
-              if (item.quantity === 0) {
+              if (qty === 0) {
                 statusText = "Hết hàng";
                 statusColor = "#e74c3c";
-              } else if (item.quantity < 20) {
+              } else if (qty < minStock) {
                 statusText = "Cần nhập gấp";
                 statusColor = "#f1c40f";
               }
@@ -222,15 +274,17 @@ function Dashboard({ products, warehouses, transactions }) {
                       color: "#34495e",
                     }}
                   >
-                    {item.id}
+                    {item.sku}
                   </td>
                   <td style={{ padding: "12px" }}>{item.name}</td>
                   <td style={{ padding: "12px", color: "#7f8c8d" }}>
                     {item.category}
                   </td>
-                  <td style={{ padding: "12px" }}>🏬 {whName}</td>
+                  <td style={{ padding: "12px" }}>
+                    🏭 {item.supplier_name || "Chưa gán NCC"}
+                  </td>
                   <td style={{ padding: "12px", fontWeight: "bold" }}>
-                    {item.quantity.toLocaleString()} chiếc
+                    {qty.toLocaleString()} {item.unit}
                   </td>
                   <td style={{ padding: "12px" }}>
                     <span

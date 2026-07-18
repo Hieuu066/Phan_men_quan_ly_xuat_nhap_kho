@@ -25,7 +25,8 @@ class ImportOrderController {
         }
 
         $sql = "SELECT * FROM " . self::TABLE . " WHERE " . implode(" AND ", $where) . " ORDER BY created_at DESC";
-        $result = Pagination::run($db, $sql, $params, $page, $perPage);
+        require_once __DIR__ . "/../utils/Pagination.php";
+        $result = Pagination::run($sql, $params, $page, $perPage);
 
         Response::paged($result['data'], $result['meta']);
     }
