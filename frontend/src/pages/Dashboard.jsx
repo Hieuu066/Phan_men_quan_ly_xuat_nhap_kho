@@ -1,101 +1,259 @@
-import { useState, useEffect } from "react";
-import { Bar, Doughnut } from "react-chartjs-2";
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement,
-  ArcElement, Title, Tooltip, Legend
-} from "chart.js";
-import { Layout } from "../components/layout/Layout";
-import { statsService } from "../services/stats.service";
+import React from "react";
 
-// Đăng ký Chart.js components
-ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+function Dashboard({ products, warehouses, transactions }) {
+  const totalItems = products.length;
+  const lowStockItems = products.filter(
+    (p) => p.quantity > 0 && p.quantity < 20,
+  ).length; // Linh kiện điện tử dưới 20 là thấp
+  const outOfStockItems = products.filter((p) => p.quantity === 0).length;
+  const totalMovements = transactions.length;
 
-function StatCard({ icon, label, value, color, trend }) {
   return (
-    <div className="card" style={{ display:"flex", alignItems:"center", gap:16 }}>
-      <div style={{ width:56, height:56, borderRadius:"var(--r-lg)",
-        background:`${color}20`, display:"flex", alignItems:"center",
-        justifyContent:"center", fontSize:28 }}>{icon}</div>
-      <div>
-        <p style={{ margin:0, fontSize:"var(--text-sm)", color:"var(--clr-gray-500)" }}>{label}</p>
-        <p style={{ margin:0, fontSize:"var(--text-3xl)", fontWeight:700, color }}>{value ?? "—"}</p>
-        {trend && <p style={{ margin:0, fontSize:"var(--text-xs)", color:"var(--clr-secondary)" }}>{trend}</p>}
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "2px solid #dee2e6",
+          paddingBottom: "15px",
+          marginBottom: "25px",
+        }}
+      >
+        <h2 style={{ margin: 0, color: "#2c3e50" }}>
+          HỆ THỐNG ĐIỀU HÀNH KHO LINH KIỆN MÁY TÍNH & ĐIỆN TỬ KTS
+        </h2>
+        <span style={{ fontWeight: "bold", color: "#3498db" }}>
+          Vai trò: Quản trị kho hàng công nghệ
+        </span>
+      </div>
+
+      {/* THẺ CHỈ SỐ KPA */}
+      <div style={{ display: "flex", gap: "20px", marginBottom: "30px" }}>
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "8px",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+            borderLeft: "5px solid #2ecc71",
+          }}
+        >
+          <h4
+            style={{
+              margin: "0 0 10px 0",
+              color: "#7f8c8d",
+              textTransform: "uppercase",
+              fontSize: "11px",
+            }}
+          >
+            Tổng SKU Linh Kiện
+          </h4>
+          <p
+            style={{
+              fontSize: "28px",
+              fontWeight: "bold",
+              margin: 0,
+              color: "#2c3e50",
+            }}
+          >
+            {totalItems}{" "}
+            <span style={{ fontSize: "14px", color: "#7f8c8d" }}>Mẫu mã</span>
+          </p>
+        </div>
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "8px",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+            borderLeft: "5px solid #f1c40f",
+          }}
+        >
+          <h4
+            style={{
+              margin: "0 0 10px 0",
+              color: "#7f8c8d",
+              textTransform: "uppercase",
+              fontSize: "11px",
+            }}
+          >
+            Sắp cháy hàng (&lt;20 chiếc)
+          </h4>
+          <p
+            style={{
+              fontSize: "28px",
+              fontWeight: "bold",
+              margin: 0,
+              color: "#f1c40f",
+            }}
+          >
+            {lowStockItems}{" "}
+            <span style={{ fontSize: "14px", color: "#7f8c8d" }}>
+              Linh kiện
+            </span>
+          </p>
+        </div>
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "8px",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+            borderLeft: "5px solid #e74c3c",
+          }}
+        >
+          <h4
+            style={{
+              margin: "0 0 10px 0",
+              color: "#7f8c8d",
+              textTransform: "uppercase",
+              fontSize: "11px",
+            }}
+          >
+            Tồn kho bằng 0
+          </h4>
+          <p
+            style={{
+              fontSize: "28px",
+              fontWeight: "bold",
+              margin: 0,
+              color: "#e74c3c",
+            }}
+          >
+            {outOfStockItems}{" "}
+            <span style={{ fontSize: "14px", color: "#7f8c8d" }}>
+              Chủng loại
+            </span>
+          </p>
+        </div>
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "8px",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+            borderLeft: "5px solid #3498db",
+          }}
+        >
+          <h4
+            style={{
+              margin: "0 0 10px 0",
+              color: "#7f8c8d",
+              textTransform: "uppercase",
+              fontSize: "11px",
+            }}
+          >
+            Lượt mua bán/giao dịch
+          </h4>
+          <p
+            style={{
+              fontSize: "28px",
+              fontWeight: "bold",
+              margin: 0,
+              color: "#3498db",
+            }}
+          >
+            {totalMovements}{" "}
+            <span style={{ fontSize: "14px", color: "#7f8c8d" }}>Chứng từ</span>
+          </p>
+        </div>
+      </div>
+
+      {/* BẢNG TỔNG QUAN TỒN KHO THỰC TẾ */}
+      <div
+        style={{
+          backgroundColor: "#fff",
+          padding: "25px",
+          borderRadius: "8px",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+        }}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: "20px", color: "#2c3e50" }}>
+          📊 Báo Cáo Hiện Trạng Tồn Kho Chi Tiết
+        </h3>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            textAlign: "left",
+          }}
+        >
+          <thead>
+            <tr
+              style={{
+                backgroundColor: "#f8f9fa",
+                borderBottom: "2px solid #dee2e6",
+              }}
+            >
+              <th style={{ padding: "12px" }}>Mã hàng</th>
+              <th style={{ padding: "12px" }}>Tên linh kiện điện tử</th>
+              <th style={{ padding: "12px" }}>Nhóm sản phẩm</th>
+              <th style={{ padding: "12px" }}>Vị trí lưu kho</th>
+              <th style={{ padding: "12px" }}>Số lượng còn lại</th>
+              <th style={{ padding: "12px" }}>Trạng thái phân phối</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((item) => {
+              const whName =
+                warehouses.find((w) => w.id === item.warehouse_id)?.name ||
+                "Chưa định vị kho";
+              let statusText = "Đủ hàng bán";
+              let statusColor = "#2ecc71";
+              if (item.quantity === 0) {
+                statusText = "Hết hàng";
+                statusColor = "#e74c3c";
+              } else if (item.quantity < 20) {
+                statusText = "Cần nhập gấp";
+                statusColor = "#f1c40f";
+              }
+
+              return (
+                <tr key={item.id} style={{ borderBottom: "1px solid #dee2e6" }}>
+                  <td
+                    style={{
+                      padding: "12px",
+                      fontWeight: "bold",
+                      color: "#34495e",
+                    }}
+                  >
+                    {item.id}
+                  </td>
+                  <td style={{ padding: "12px" }}>{item.name}</td>
+                  <td style={{ padding: "12px", color: "#7f8c8d" }}>
+                    {item.category}
+                  </td>
+                  <td style={{ padding: "12px" }}>🏬 {whName}</td>
+                  <td style={{ padding: "12px", fontWeight: "bold" }}>
+                    {item.quantity.toLocaleString()} chiếc
+                  </td>
+                  <td style={{ padding: "12px" }}>
+                    <span
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "20px",
+                        fontSize: "11px",
+                        color: "#fff",
+                        fontWeight: "bold",
+                        backgroundColor: statusColor,
+                      }}
+                    >
+                      {statusText}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
-export default function Dashboard() {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    statsService.getSummary()
-      .then(r => { if (r.success) setStats(r.data); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <Layout><div style={{ textAlign:"center",padding:60 }}>Đang tải...</div></Layout>;
-
-  // Dữ liệu biểu đồ cột (số lượng theo tháng)
-  const monthly = stats?.monthly_items || [];
-  const barData = {
-    labels: monthly.map(m => m.month),
-    datasets: [{ label:"Bản ghi mới", data: monthly.map(m => m.cnt),
-      backgroundColor:"rgba(26,82,118,.7)", borderRadius:6 }],
-  };
-
-  // Dữ liệu biểu đồ tròn (người dùng theo vai trò)
-  const roleData = stats?.users_by_role || {};
-  const doughnutData = {
-    labels: Object.keys(roleData),
-    datasets: [{ data: Object.values(roleData),
-      backgroundColor:["#1a5276","#27ae60","#f39c12","#e74c3c"] }],
-  };
-
-  return (
-    <Layout>
-      <h2 style={{ marginBottom:"var(--sp-6)" }}>Tổng quan hệ thống</h2>
-
-      {/* Stat cards */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:"var(--sp-4)", marginBottom:"var(--sp-6)" }}>
-        <StatCard icon="👥" label="Tổng người dùng" value={stats?.users_total} color="var(--clr-primary)" />
-        <StatCard icon="📋" label="Tổng bản ghi" value={stats?.items_total} color="var(--clr-secondary)" />
-        <StatCard icon="✅" label="Đang hoạt động" value={stats?.items_active} color="var(--clr-info)" />
-      </div>
-
-      {/* Charts */}
-      <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:"var(--sp-4)", marginBottom:"var(--sp-6)" }}>
-        <div className="card">
-          <h3 style={{ marginBottom:"var(--sp-4)", fontSize:"var(--text-base)" }}>Tăng trưởng 6 tháng gần nhất</h3>
-          <Bar data={barData} options={{ responsive:true, plugins:{ legend:{display:false} } }} />
-        </div>
-        <div className="card">
-          <h3 style={{ marginBottom:"var(--sp-4)", fontSize:"var(--text-base)" }}>Phân bố người dùng</h3>
-          <Doughnut data={doughnutData} options={{ responsive:true }} />
-        </div>
-      </div>
-
-      {/* Recent items */}
-      <div className="card">
-        <h3 style={{ marginBottom:"var(--sp-4)", fontSize:"var(--text-base)" }}>Bản ghi mới nhất</h3>
-        <div className="table-wrap">
-          <table className="table">
-            <thead><tr><th>ID</th><th>Tên</th><th>Trạng thái</th><th>Ngày tạo</th></tr></thead>
-            <tbody>
-              {(stats?.recent_items || []).map(item => (
-                <tr key={item.id}>
-                  <td>{item.id}</td>
-                  <td>{item.name}</td>
-                  <td><span className={`badge badge-${item.status === "active" ? "success" : "danger"}`}>{item.status}</span></td>
-                  <td>{new Date(item.created_at).toLocaleDateString("vi-VN")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </Layout>
-  );
-}
+export default Dashboard;
