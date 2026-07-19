@@ -3,20 +3,61 @@ import { productService } from '../services/product.service';
 import { supplierService } from '../services/supplier.service';
 import { orderService } from '../services/order.service';
 
+// ── Toast nhẹ nhàng, tự biến mất — thay cho alert() gây giật mình ──
+function Toast({ toast, onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 3500);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  const styles = {
+    success: { bg: '#e6f7ee', border: '#2ecc71', color: '#1e7e4f' },
+    error: { bg: '#fdecea', border: '#e74c3c', color: '#a02f24' },
+  };
+  const s = styles[toast.type] || styles.success;
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 999,
+      backgroundColor: s.bg, border: `1px solid ${s.border}`, color: s.color,
+      padding: '14px 20px', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+      maxWidth: 360, fontSize: 14, display: 'flex', alignItems: 'flex-start', gap: 10,
+    }}>
+      <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+      <span style={{ flex: 1 }}>{toast.message}</span>
+      <button onClick={onClose} style={{ background: 'none', border: 'none', color: s.color, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+    </div>
+  );
+}
+
+const stepStyle = (active, done) => ({
+  width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  fontWeight: 'bold', fontSize: 14, flexShrink: 0,
+  backgroundColor: done ? '#2ecc71' : active ? '#3498db' : '#e0e4e8',
+  color: done || active ? '#fff' : '#8a94a0',
+});
+
 function Transactions() {
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null);
 
-  const [type, setType] = useState('import'); // 'import' | 'export'
-  const [productId, setProductId] = useState('');
+  // Bước 1 — thông tin đầu phiếu
+  const [type, setType] = useState('import');
   const [supplierId, setSupplierId] = useState('');
   const [nguoiNhan, setNguoiNhan] = useState('');
-  const [qty, setQty] = useState('');
-  const [unitPrice, setUnitPrice] = useState('');
   const [note, setNote] = useState('');
+
+  // Bước 2 — danh sách mặt hàng (giỏ hàng của phiếu)
+  const [cart, setCart] = useState([]);
+  const [lineProductId, setLineProductId] = useState('');
+  const [lineQty, setLineQty] = useState('');
+  const [lineUnitPrice, setLineUnitPrice] = useState('');
+
+  const showToast = (message, type = 'success') => setToast({ message, type });
 
   const loadAll = useCallback(async () => {
     const [prodRes, supRes, impRes, expRes] = await Promise.all([
@@ -34,32 +75,61 @@ function Transactions() {
     setHistory(merged);
   }, []);
 
-  useEffect(() => {
-    loadAll().finally(() => setLoading(false));
-  }, [loadAll]);
+  useEffect(() => { loadAll().finally(() => setLoading(false)); }, [loadAll]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!productId || !qty || !unitPrice) return alert('Vui lòng điền đủ thông tin bắt buộc!');
+  // Đổi loại phiếu (nhập/xuất) thì giỏ hàng đang dở phải reset, tránh gửi nhầm loại
+  const handleChangeType = (newType) => {
+    setType(newType);
+    setSupplierId('');
+    setNguoiNhan('');
+    setCart([]);
+  };
 
+  const selectedProduct = products.find((p) => String(p.id) === String(lineProductId));
+
+  const handleAddLine = () => {
+    if (!lineProductId || !lineQty || !lineUnitPrice) {
+      showToast('Chọn sản phẩm và nhập đủ số lượng, đơn giá trước khi thêm.', 'error');
+      return;
+    }
+    const qty = Number(lineQty);
+    if (type === 'export' && selectedProduct && qty > Number(selectedProduct.quantity_on_hand)) {
+      showToast(`"${selectedProduct.name}" chỉ còn ${selectedProduct.quantity_on_hand}, không đủ để xuất ${qty}.`, 'error');
+      return;
+    }
+    setCart((c) => [...c, {
+      key: Date.now(),
+      product_id: Number(lineProductId),
+      name: selectedProduct?.name || '',
+      sku: selectedProduct?.sku || '',
+      quantity: qty,
+      unit_price: Number(lineUnitPrice),
+    }]);
+    setLineProductId(''); setLineQty(''); setLineUnitPrice('');
+  };
+
+  const removeLine = (key) => setCart((c) => c.filter((l) => l.key !== key));
+
+  const cartTotal = cart.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
+
+  const canGoStep2 = type === 'export' ? nguoiNhan.trim() !== '' : supplierId !== '';
+  const canSubmit = cart.length > 0;
+
+  const handleSubmitOrder = async () => {
+    if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const details = [{ product_id: Number(productId), quantity: Number(qty), unit_price: Number(unitPrice) }];
-
+      const details = cart.map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price }));
       if (type === 'import') {
-        if (!supplierId) { alert('Vui lòng chọn nhà cung cấp.'); return; }
         await orderService.createImportOrder({ supplier_id: Number(supplierId), note, details });
       } else {
-        if (!nguoiNhan.trim()) { alert('Vui lòng nhập người/bộ phận nhận hàng.'); return; }
         await orderService.createExportOrder({ nguoi_nhan: nguoiNhan.trim(), note, details });
       }
-
-      setProductId(''); setSupplierId(''); setNguoiNhan(''); setQty(''); setUnitPrice(''); setNote('');
-      alert('Tạo phiếu thành công! Kho hàng đã được cập nhật.');
+      showToast(`Tạo phiếu ${type === 'import' ? 'nhập' : 'xuất'} thành công với ${cart.length} mặt hàng!`);
+      setSupplierId(''); setNguoiNhan(''); setNote(''); setCart([]);
       await loadAll();
     } catch (err) {
-      // Trigger CSDL sẽ chặn nếu xuất vượt tồn kho, thông báo trả về đã có sẵn từ backend
-      alert(err.response?.data?.message || 'Không thể tạo phiếu. Vui lòng thử lại.');
+      showToast(err.response?.data?.message || 'Không thể tạo phiếu. Vui lòng thử lại.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -69,42 +139,127 @@ function Transactions() {
 
   return (
     <div>
-      <h2>🔄 QUẢN LÝ GIAO DỊCH MUA BÁN & XUẤT NHẬP KHO</h2>
+      {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
+      <h2 style={{ marginBottom: 4 }}>🔄 Quản Lý Giao Dịch Mua Bán & Xuất Nhập Kho</h2>
+      <p style={{ color: '#7f8c8d', marginTop: 0, marginBottom: 24, fontSize: 14 }}>
+        Tạo 1 phiếu cho nhiều mặt hàng cùng lúc — chỉ 3 bước, không cần lặp lại form cho từng sản phẩm.
+      </p>
 
-      <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '25px' }}>
-        <h3 style={{ marginTop: 0 }}>📋 Khởi Tạo Chứng Từ (Nhập Mua / Xuất Bán)</h3>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-          <select value={type} onChange={(e) => { setType(e.target.value); setSupplierId(''); setNguoiNhan(''); }} style={{ padding: '8px', flex: 1 }}>
-            <option value="import">📥 Nhập mua linh kiện (Goods Receipt)</option>
-            <option value="export">📤 Xuất bán linh kiện (Goods Issue)</option>
-          </select>
+      <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '25px' }}>
 
-          <select value={productId} onChange={(e) => setProductId(e.target.value)} required style={{ padding: '8px', flex: 2 }}>
-            <option value="">-- Chọn Linh Kiện --</option>
-            {products.map(p => <option key={p.id} value={p.id}>{p.sku} - {p.name} (Tồn: {p.quantity_on_hand})</option>)}
-          </select>
+        {/* ── BƯỚC 1: THÔNG TIN ĐẦU PHIẾU ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <div style={stepStyle(true, canGoStep2)}>1</div>
+          <h3 style={{ margin: 0, fontSize: 16, color: '#2c3e50' }}>Thông tin phiếu</h3>
+        </div>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, paddingLeft: 42 }}>
+          <div style={{ flex: '1 1 220px' }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 6 }}>Loại phiếu</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" onClick={() => handleChangeType('import')} style={{ flex: 1, padding: '10px', borderRadius: 6, border: type === 'import' ? '2px solid #2ecc71' : '1px solid #dcdfe3', backgroundColor: type === 'import' ? '#eafaf1' : '#fff', color: type === 'import' ? '#1e7e4f' : '#5a6c7a', cursor: 'pointer', fontWeight: 'bold' }}>📥 Nhập mua</button>
+              <button type="button" onClick={() => handleChangeType('export')} style={{ flex: 1, padding: '10px', borderRadius: 6, border: type === 'export' ? '2px solid #e67e22' : '1px solid #dcdfe3', backgroundColor: type === 'export' ? '#fef2e7' : '#fff', color: type === 'export' ? '#a4560c' : '#5a6c7a', cursor: 'pointer', fontWeight: 'bold' }}>📤 Xuất bán</button>
+            </div>
+          </div>
 
-          {type === 'import' ? (
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required style={{ padding: '8px', flex: 2 }}>
-              <option value="">-- Chọn Nhà Cung Cấp --</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          ) : (
-            <input type="text" placeholder="Người / bộ phận nhận hàng" value={nguoiNhan} onChange={(e) => setNguoiNhan(e.target.value)} required style={{ padding: '8px', flex: 2 }} />
-          )}
+          <div style={{ flex: '1 1 220px' }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 6 }}>
+              {type === 'import' ? 'Nhà cung cấp' : 'Người / bộ phận nhận'}
+            </label>
+            {type === 'import' ? (
+              <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3', boxSizing: 'border-box' }}>
+                <option value="">-- Chọn nhà cung cấp --</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            ) : (
+              <input type="text" placeholder="VD: Phòng Kỹ thuật" value={nguoiNhan} onChange={(e) => setNguoiNhan(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3', boxSizing: 'border-box' }} />
+            )}
+          </div>
 
-          <input type="number" placeholder="Số lượng" value={qty} onChange={(e) => setQty(e.target.value)} min="1" required style={{ padding: '8px', flex: 1 }} />
-          <input type="number" placeholder="Đơn giá" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} min="0" required style={{ padding: '8px', flex: 1 }} />
-          <input type="text" placeholder="Mô tả giao dịch" value={note} onChange={(e) => setNote(e.target.value)} style={{ padding: '8px', flex: 2 }} />
+          <div style={{ flex: '1 1 220px' }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 6 }}>Ghi chú (không bắt buộc)</label>
+            <input type="text" placeholder="Mô tả giao dịch..." value={note} onChange={(e) => setNote(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3', boxSizing: 'border-box' }} />
+          </div>
+        </div>
 
-          <button type="submit" disabled={submitting} style={{ padding: '8px 20px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', opacity: submitting ? 0.6 : 1 }}>
-            {submitting ? 'Đang xử lý...' : 'Xác Nhận Ký Duyệt'}
+        <div style={{ borderTop: '1px solid #eef0f2', margin: '20px 0' }} />
+
+        {/* ── BƯỚC 2: THÊM MẶT HÀNG ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, opacity: canGoStep2 ? 1 : 0.4 }}>
+          <div style={stepStyle(canGoStep2, cart.length > 0)}>2</div>
+          <h3 style={{ margin: 0, fontSize: 16, color: '#2c3e50' }}>Thêm từng mặt hàng vào phiếu</h3>
+        </div>
+
+        {canGoStep2 && (
+          <div style={{ paddingLeft: 42 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+              <select value={lineProductId} onChange={(e) => setLineProductId(e.target.value)} style={{ flex: '2 1 220px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }}>
+                <option value="">-- Chọn sản phẩm --</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.sku} - {p.name} (Tồn: {p.quantity_on_hand})</option>)}
+              </select>
+              <input type="number" placeholder="Số lượng" value={lineQty} onChange={(e) => setLineQty(e.target.value)} min="1" style={{ flex: '1 1 110px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }} />
+              <input type="number" placeholder="Đơn giá" value={lineUnitPrice} onChange={(e) => setLineUnitPrice(e.target.value)} min="0" style={{ flex: '1 1 130px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }} />
+              <button type="button" onClick={handleAddLine} style={{ padding: '10px 18px', backgroundColor: '#3498db', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}>+ Thêm vào phiếu</button>
+            </div>
+
+            {cart.length > 0 && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ fontSize: 12, color: '#8a94a0', textAlign: 'left' }}>
+                    <th style={{ padding: '6px 8px' }}>Sản phẩm</th>
+                    <th style={{ padding: '6px 8px' }}>SL</th>
+                    <th style={{ padding: '6px 8px' }}>Đơn giá</th>
+                    <th style={{ padding: '6px 8px' }}>Thành tiền</th>
+                    <th style={{ padding: '6px 8px' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cart.map((l) => (
+                    <tr key={l.key} style={{ borderTop: '1px solid #eef0f2' }}>
+                      <td style={{ padding: '8px' }}>{l.sku} — {l.name}</td>
+                      <td style={{ padding: '8px' }}>{l.quantity}</td>
+                      <td style={{ padding: '8px' }}>{l.unit_price.toLocaleString()}đ</td>
+                      <td style={{ padding: '8px', fontWeight: 'bold' }}>{(l.quantity * l.unit_price).toLocaleString()}đ</td>
+                      <td style={{ padding: '8px' }}>
+                        <button onClick={() => removeLine(l.key)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 13 }}>Xoá</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        <div style={{ borderTop: '1px solid #eef0f2', margin: '20px 0' }} />
+
+        {/* ── BƯỚC 3: XÁC NHẬN & GỬI ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, opacity: canSubmit ? 1 : 0.4 }}>
+          <div style={stepStyle(canSubmit, false)}>3</div>
+          <h3 style={{ margin: 0, fontSize: 16, color: '#2c3e50' }}>Xác nhận & gửi phiếu</h3>
+        </div>
+        <div style={{ paddingLeft: 42, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <span style={{ fontSize: 15 }}>
+            Tổng giá trị phiếu: <strong style={{ fontSize: 18, color: '#2c3e50' }}>{cartTotal.toLocaleString()}đ</strong>
+            <span style={{ color: '#8a94a0', fontSize: 13 }}> ({cart.length} mặt hàng)</span>
+          </span>
+          <button
+            onClick={handleSubmitOrder}
+            disabled={!canSubmit || submitting}
+            style={{
+              padding: '12px 28px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 15,
+              cursor: canSubmit && !submitting ? 'pointer' : 'not-allowed',
+              backgroundColor: canSubmit ? '#2ecc71' : '#c9ced3',
+              color: '#fff', opacity: submitting ? 0.7 : 1,
+            }}
+          >
+            {submitting ? 'Đang gửi...' : `✓ Tạo phiếu ${type === 'import' ? 'nhập' : 'xuất'}`}
           </button>
-        </form>
+        </div>
       </div>
 
-      <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-        <h3>📜 Nhật Ký Giao Dịch Kho Công Nghệ</h3>
+      {/* LỊCH SỬ GIAO DỊCH */}
+      <div className="app-table-wrap" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+        <h3 style={{ marginTop: 0 }}>📜 Nhật Ký Giao Dịch Kho Công Nghệ</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
@@ -117,7 +272,9 @@ function Transactions() {
             </tr>
           </thead>
           <tbody>
-            {history.map(tx => (
+            {history.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>Chưa có giao dịch nào.</td></tr>
+            ) : history.map(tx => (
               <tr key={`${tx._type}-${tx.id}`} style={{ borderBottom: '1px solid #dee2e6' }}>
                 <td style={{ padding: '12px', fontWeight: 'bold' }}>{tx.code || `#${tx.id}`}</td>
                 <td style={{ padding: '12px' }}>
