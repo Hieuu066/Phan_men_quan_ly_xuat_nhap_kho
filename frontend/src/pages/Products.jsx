@@ -2,13 +2,26 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { productService } from '../services/product.service';
 import { supplierService } from '../services/supplier.service';
 
+function useDebounce(value, delay = 400) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
 function Products() {
   const [products, setProducts] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // States cho form thêm mới
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebounce(search, 400);
+
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
@@ -16,7 +29,6 @@ function Products() {
   const [supplierId, setSupplierId] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // States hỗ trợ tính năng sửa (Update) trực tiếp dòng dữ liệu
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('');
@@ -25,25 +37,28 @@ function Products() {
 
   const loadProducts = useCallback(async () => {
     try {
-      const res = await productService.getAll({ per_page: 100 });
-      if (res.success) setProducts(res.data);
+      const res = await productService.getAll({ page, per_page: 10, search: debouncedSearch });
+      if (res.success) { setProducts(res.data); setMeta(res.meta); }
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể tải danh sách linh kiện.');
     }
-  }, []);
+  }, [page, debouncedSearch]);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch]);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
-      productService.getAll({ per_page: 100 }),
+      productService.getAll({ page, per_page: 10, search: debouncedSearch }),
       supplierService.getAll({ per_page: 100 }),
     ])
       .then(([prodRes, supRes]) => {
-        if (prodRes.success) setProducts(prodRes.data);
+        if (prodRes.success) { setProducts(prodRes.data); setMeta(prodRes.meta); }
         if (supRes.success) setSuppliers(supRes.data);
       })
       .catch((err) => setError(err.response?.data?.message || 'Không thể tải dữ liệu.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [page, debouncedSearch]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -80,7 +95,6 @@ function Products() {
         alert(res.message);
       }
     } catch (err) {
-      // Backend chặn xoá nếu sản phẩm đã phát sinh giao dịch nhập/xuất (lỗi 409/500 tuỳ cấu hình)
       alert(err.response?.data?.message || 'Không thể xoá linh kiện này (có thể đã phát sinh giao dịch nhập/xuất).');
     }
   };
@@ -113,14 +127,23 @@ function Products() {
     }
   };
 
+  const handleExportCSV = () => {
+    const base = import.meta.env.VITE_API_BASE || '';
+    window.open(`${base}/api/items/export`, '_blank');
+  };
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Đang tải dữ liệu...</div>;
 
   return (
     <div>
-      <h2>📦 QUẢN LÝ DANH MỤC LINH KIỆN MÁY TÍNH & ĐIỆN TỬ</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2>📦 QUẢN LÝ DANH MỤC LINH KIỆN MÁY TÍNH & ĐIỆN TỬ</h2>
+        <button onClick={handleExportCSV} style={{ padding: '8px 16px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', height: 'fit-content' }}>
+          📥 Xuất CSV
+        </button>
+      </div>
       {error && <div style={{ padding: 10, marginBottom: 15, backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>{error}</div>}
 
-      {/* FORM KHỞI TẠO VẬT TƯ MỚI */}
       <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '25px' }}>
         <h3 style={{ marginTop: 0 }}>➕ Khai báo thêm mã linh kiện mới</h3>
         <form onSubmit={handleAdd} style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
@@ -144,9 +167,18 @@ function Products() {
         </p>
       </div>
 
-      {/* BẢNG CHỨA CÁC THAO TÁC CRUD */}
       <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-        <h3>📦 Cơ Sở Dữ Liệu Tồn Kho Toàn Hệ Thống</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+          <h3 style={{ margin: 0 }}>📦 Cơ Sở Dữ Liệu Tồn Kho Toàn Hệ Thống</h3>
+          <input
+            type="text"
+            placeholder="🔍 Tìm theo tên hoặc mã SKU..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ padding: '8px 12px', width: '280px', border: '1px solid #ccc', borderRadius: '4px' }}
+          />
+        </div>
+
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ backgroundColor: '#2c3e50', color: 'white' }}>
@@ -160,7 +192,9 @@ function Products() {
             </tr>
           </thead>
           <tbody>
-            {products.map(item => {
+            {products.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>Không tìm thấy linh kiện phù hợp.</td></tr>
+            ) : products.map(item => {
               const isEditing = editingId === item.id;
               return (
                 <tr key={item.id} style={{ borderBottom: '1px solid #dee2e6' }}>
@@ -201,6 +235,17 @@ function Products() {
             })}
           </tbody>
         </table>
+
+        {meta && meta.total_pages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
+            <span style={{ fontSize: 13, color: '#7f8c8d' }}>Hiển thị {meta.from}–{meta.to} / {meta.total} linh kiện</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setPage(p => p - 1)} disabled={!meta.has_prev} style={{ padding: '6px 12px', border: '1px solid #ccc', borderRadius: 4, backgroundColor: meta.has_prev ? '#fff' : '#f1f1f1', cursor: meta.has_prev ? 'pointer' : 'not-allowed' }}>‹ Trước</button>
+              <span style={{ padding: '6px 12px' }}>Trang {meta.current_page}/{meta.total_pages}</span>
+              <button onClick={() => setPage(p => p + 1)} disabled={!meta.has_next} style={{ padding: '6px 12px', border: '1px solid #ccc', borderRadius: 4, backgroundColor: meta.has_next ? '#fff' : '#f1f1f1', cursor: meta.has_next ? 'pointer' : 'not-allowed' }}>Sau ›</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
