@@ -13,6 +13,7 @@ import {
 import { reportService } from "../services/report.service";
 import { productService } from "../services/product.service";
 import { orderService } from "../services/order.service";
+import { formatNumber } from "../utils/format";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -203,7 +204,7 @@ function Dashboard() {
                   <td style={{ padding: "12px" }}>{item.name}</td>
                   <td style={{ padding: "12px", color: "#7f8c8d" }}>{item.category}</td>
                   <td style={{ padding: "12px" }}>🏭 {item.supplier_name || "Chưa gán NCC"}</td>
-                  <td style={{ padding: "12px", fontWeight: "bold" }}>{qty.toLocaleString()} {item.unit}</td>
+                  <td style={{ padding: "12px", fontWeight: "bold" }}>{formatNumber(qty)} {item.unit}</td>
                   <td style={{ padding: "12px" }}>
                     <span style={{ padding: "4px 10px", borderRadius: "20px", fontSize: "11px", color: "#fff", fontWeight: "bold", backgroundColor: statusColor }}>
                       {statusText}

@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { userService } from '../services/user.service';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/useToast';
+import { ToastContainer, ConfirmModal } from '../components/Feedback';
 
 function Users() {
   const { user: currentUser } = useAuth();
+  const toast = useToast();
+  const [confirmState, setConfirmState] = useState(null);
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,12 +52,13 @@ function Users() {
       const res = await userService.create({ username, password, full_name: fullName, role });
       if (res.success) {
         setUsername(''); setPassword(''); setFullName(''); setRole('user');
+        toast.success('Đã tạo tài khoản mới.');
         await load();
       } else {
-        alert(res.message);
+        toast.error(res.message);
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể tạo tài khoản.');
+      toast.error(err.response?.data?.message || 'Không thể tạo tài khoản.');
     } finally {
       setSubmitting(false);
     }
@@ -68,101 +74,124 @@ function Users() {
   const handleSaveEdit = async (id) => {
     try {
       const res = await userService.update(id, { full_name: editFullName, role: editRole, status: editStatus });
-      if (res.success) { setEditingId(null); await load(); }
-      else alert(res.message);
+      if (res.success) { setEditingId(null); toast.success('Đã cập nhật người dùng.'); await load(); }
+      else toast.error(res.message);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể cập nhật người dùng.');
+      toast.error(err.response?.data?.message || 'Không thể cập nhật người dùng.');
     }
   };
 
-  const handleToggleStatus = async (u) => {
+  const handleToggleStatus = (u) => {
     const newStatus = u.status === 'active' ? 'inactive' : 'active';
-    if (!window.confirm(`${newStatus === 'inactive' ? 'Khóa' : 'Mở khóa'} tài khoản "${u.username}"?`)) return;
-    try {
-      const res = await userService.update(u.id, { status: newStatus });
-      if (res.success) await load();
-      else alert(res.message);
-    } catch (err) {
-      alert(err.response?.data?.message || 'Không thể đổi trạng thái tài khoản.');
-    }
+    setConfirmState({
+      title: newStatus === 'inactive' ? 'Khoá tài khoản' : 'Mở khoá tài khoản',
+      message: `${newStatus === 'inactive' ? 'Khóa' : 'Mở khóa'} tài khoản "${u.username}"?`,
+      confirmLabel: newStatus === 'inactive' ? 'Khoá' : 'Mở khoá',
+      onConfirm: async () => {
+        try {
+          const res = await userService.update(u.id, { status: newStatus });
+          if (res.success) { toast.success('Đã cập nhật trạng thái tài khoản.'); await load(); }
+          else toast.error(res.message);
+        } catch (err) {
+          toast.error(err.response?.data?.message || 'Không thể đổi trạng thái tài khoản.');
+        }
+      },
+    });
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Đang tải dữ liệu...</div>;
 
   return (
     <div>
+      <ToastContainer toasts={toast.toasts} onRemove={toast.remove} />
+      <ConfirmModal state={confirmState} onClose={() => setConfirmState(null)} />
+
       <h2>👤 QUẢN LÝ NGƯỜI DÙNG HỆ THỐNG</h2>
       {error && <div style={{ padding: 10, marginBottom: 15, backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>{error}</div>}
 
       <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '25px' }}>
         <h3 style={{ marginTop: 0 }}>➕ Tạo tài khoản mới</h3>
-        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-          <input type="text" placeholder="Tên đăng nhập" value={username} onChange={(e) => setUsername(e.target.value)} required style={{ padding: '8px', flex: 1 }} />
-          <input type="password" placeholder="Mật khẩu (tối thiểu 8 ký tự)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} style={{ padding: '8px', flex: 1 }} />
-          <input type="text" placeholder="Họ và tên" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={{ padding: '8px', flex: 1 }} />
-          <select value={role} onChange={(e) => setRole(e.target.value)} style={{ padding: '8px', flex: 1 }}>
-            <option value="user">Nhân viên (user)</option>
-            <option value="admin">Quản trị viên (admin)</option>
-          </select>
-          <button type="submit" disabled={submitting} style={{ padding: '8px 20px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', opacity: submitting ? 0.6 : 1 }}>
+        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 5 }}>Tên đăng nhập</label>
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required style={{ padding: '9px', width: '100%', boxSizing: 'border-box', border: '1px solid #dcdfe3', borderRadius: 6 }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 5 }}>Mật khẩu (tối thiểu 8 ký tự)</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} style={{ padding: '9px', width: '100%', boxSizing: 'border-box', border: '1px solid #dcdfe3', borderRadius: 6 }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 5 }}>Họ và tên</label>
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={{ padding: '9px', width: '100%', boxSizing: 'border-box', border: '1px solid #dcdfe3', borderRadius: 6 }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 5 }}>Vai trò</label>
+            <select value={role} onChange={(e) => setRole(e.target.value)} style={{ padding: '9px', width: '100%', boxSizing: 'border-box', border: '1px solid #dcdfe3', borderRadius: 6 }}>
+              <option value="user">Nhân viên (user)</option>
+              <option value="admin">Quản trị viên (admin)</option>
+            </select>
+          </div>
+          <button type="submit" disabled={submitting} className="btn btn-primary">
             {submitting ? 'Đang tạo...' : 'Tạo Tài Khoản'}
           </button>
         </form>
       </div>
 
       <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#2c3e50', color: 'white' }}>
-              <th style={{ padding: '12px' }}>Tên đăng nhập</th>
-              <th style={{ padding: '12px' }}>Họ tên</th>
-              <th style={{ padding: '12px' }}>Vai trò</th>
-              <th style={{ padding: '12px' }}>Trạng thái</th>
-              <th style={{ padding: '12px' }}>Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => {
-              const isEditing = editingId === u.id;
-              return (
-                <tr key={u.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                  <td style={{ padding: '12px', fontWeight: 'bold' }}>{u.username}</td>
-                  <td style={{ padding: '12px' }}>
-                    {isEditing ? <input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} style={{ padding: '5px', width: '90%' }} /> : u.full_name}
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    {isEditing ? (
-                      <select value={editRole} onChange={(e) => setEditRole(e.target.value)} style={{ padding: '5px' }}>
-                        <option value="user">user</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    ) : u.role}
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', color: '#fff', backgroundColor: u.status === 'active' ? '#2ecc71' : '#e74c3c' }}>
-                      {u.status === 'active' ? 'Hoạt động' : 'Đã khoá'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    {isEditing ? (
-                      <>
-                        <button onClick={() => handleSaveEdit(u.id)} style={{ marginRight: '5px', padding: '5px 10px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Lưu</button>
-                        <button onClick={() => setEditingId(null)} style={{ padding: '5px 10px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Hủy</button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => startEdit(u)} style={{ marginRight: '5px', padding: '5px 10px', backgroundColor: '#f1c40f', color: 'black', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Sửa</button>
-                        <button onClick={() => handleToggleStatus(u)} style={{ padding: '5px 10px', backgroundColor: u.status === 'active' ? '#e74c3c' : '#2ecc71', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                          {u.status === 'active' ? 'Khoá' : 'Mở khoá'}
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="app-table-wrap">
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#2c3e50', color: 'white' }}>
+                <th style={{ padding: '12px' }}>Tên đăng nhập</th>
+                <th style={{ padding: '12px' }}>Họ tên</th>
+                <th style={{ padding: '12px' }}>Vai trò</th>
+                <th style={{ padding: '12px' }}>Trạng thái</th>
+                <th style={{ padding: '12px' }}>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => {
+                const isEditing = editingId === u.id;
+                return (
+                  <tr key={u.id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                    <td style={{ padding: '12px', fontWeight: 'bold' }}>{u.username}</td>
+                    <td style={{ padding: '12px' }}>
+                      {isEditing ? <input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} style={{ padding: '6px', width: '90%', border: '1px solid #dcdfe3', borderRadius: 4 }} /> : u.full_name}
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      {isEditing ? (
+                        <select value={editRole} onChange={(e) => setEditRole(e.target.value)} style={{ padding: '6px', border: '1px solid #dcdfe3', borderRadius: 4 }}>
+                          <option value="user">user</option>
+                          <option value="admin">admin</option>
+                        </select>
+                      ) : u.role}
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', color: '#fff', backgroundColor: u.status === 'active' ? '#2ecc71' : '#e74c3c' }}>
+                        {u.status === 'active' ? 'Hoạt động' : 'Đã khoá'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      {isEditing ? (
+                        <>
+                          <button onClick={() => handleSaveEdit(u.id)} className="btn btn-success btn-sm" style={{ marginRight: 6 }}>Lưu</button>
+                          <button onClick={() => setEditingId(null)} className="btn btn-outline btn-sm">Hủy</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => startEdit(u)} className="btn btn-warning btn-sm" style={{ marginRight: 6 }}>Sửa</button>
+                          <button onClick={() => handleToggleStatus(u)} className={`btn btn-sm ${u.status === 'active' ? 'btn-danger' : 'btn-success'}`}>
+                            {u.status === 'active' ? 'Khoá' : 'Mở khoá'}
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
