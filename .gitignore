@@ -1,5 +1,36 @@
-<<<<<<< HEAD
-# Logs
+# ── Frontend ──────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.production
+node_modules
+dist
+dist-ssr
+*.local
+
+# ── Backend ───────────────────────────────────────
+backend/config/database.php       # Không commit thông tin kết nối thật
+backend/config/database.local.php # Ghi đè cấu hình CSDL riêng từng máy, không commit
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ── Hệ điều hành ──────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.vscode/launch.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── Log files ──────────────────────────────────────
 logs
 *.log
 npm-debug.log*
@@ -7,40 +38,3 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-=======
-# ── Frontend ──────────────────────────────────────
-frontend/node_modules/
-frontend/dist/
-frontend/.env.local
-frontend/.env.production
-# ── Backend ───────────────────────────────────────
-backend/config/database.php # Không commit thông tin kết nối thật
-backend/uploads/* 
-!backend/uploads/.gitkeep
-# ── Hệ điều hành ──────────────────────────────────
-.DS_Store
-Thumbs.db
-desktop.ini
-# ── Editor ────────────────────────────────────────
-.vscode/launch.json
-*.swp
-# ── Log files ──────────────────────────────────────
-*.log
-npm-debug.log*
->>>>>>> cddf4a6a38642c35c2e27a0734f6962f51b5de56

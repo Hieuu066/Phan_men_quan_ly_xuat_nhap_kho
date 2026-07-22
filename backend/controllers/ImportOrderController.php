@@ -5,6 +5,7 @@ class ImportOrderController {
 
     // GET /api/import-orders
     public static function index() {
+        Auth::required();
         $db = getDB();
         
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -33,6 +34,7 @@ class ImportOrderController {
 
     // GET /api/import-orders/{id}
     public static function show($id) {
+        Auth::required();
         $db = getDB();
         
         // 1. Lấy thông tin đầu phiếu
@@ -75,6 +77,7 @@ class ImportOrderController {
 
     // POST /api/import-orders
     public static function store($body) {
+        Auth::required();
         $db = getDB();
 
         if (empty($body['supplier_id']) || empty($body['details']) || !is_array($body['details'])) {

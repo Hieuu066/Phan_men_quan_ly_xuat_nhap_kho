@@ -6,6 +6,7 @@ class SupplierController {
 
     // GET /api/suppliers?page=1&per_page=10&search=
     public static function index() {
+        Auth::required();
         $db = getDB();
         
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -53,6 +54,7 @@ class SupplierController {
 
     // GET /api/suppliers/{id}
     public static function show($id) {
+        Auth::required();
         $db = getDB();
         $stmt = $db->prepare("SELECT * FROM " . self::TABLE . " WHERE id = ?");
         $stmt->execute([$id]);
@@ -67,6 +69,7 @@ class SupplierController {
 
     // POST /api/suppliers
     public static function store($body) {
+        Auth::required();
         $db = getDB();
         
         // Validate
@@ -91,6 +94,7 @@ class SupplierController {
 
     // PUT /api/suppliers/{id}
     public static function update($id, $body) {
+        Auth::required();
         $db = getDB();
         
         if (empty($body['name'])) {
@@ -119,6 +123,7 @@ class SupplierController {
 
     // DELETE /api/suppliers/{id}
     public static function destroy($id) {
+        Auth::required();
         $db = getDB();
         
         // Soft delete: chuyển trạng thái thành inactive

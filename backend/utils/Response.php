@@ -9,8 +9,7 @@ class Response {
         echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
-    public static function ok(mixed $data = null, string $msg = "Thanh
-    cong"): never {
+    public static function ok(mixed $data = null, string $msg = "Thanh cong"): never {
         self::json(["success"=>true, "message"=>$msg, "data"=>$data]);
     }
     public static function err(string $msg, int $status = 400): never {

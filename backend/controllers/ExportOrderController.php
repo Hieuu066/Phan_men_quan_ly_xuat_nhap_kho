@@ -5,6 +5,7 @@ class ExportOrderController {
 
     // GET /api/export-orders
     public static function index() {
+        Auth::required();
         $db = getDB();
         
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -33,6 +34,7 @@ class ExportOrderController {
 
     // GET /api/export-orders/{id}
     public static function show($id) {
+        Auth::required();
         $db = getDB();
         
         // 1. Lấy thông tin đầu phiếu
@@ -74,6 +76,7 @@ class ExportOrderController {
 
     // POST /api/export-orders
     public static function store($body) {
+        Auth::required();
         $db = getDB();
 
         // Kiểm tra nguoi_nhan thay vì supplier_id
