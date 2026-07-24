@@ -3,6 +3,7 @@
 class ItemController {
     private const TABLE = "san_pham"; // ← Đổi tên bảng
     private const PER_PAGE = 10; // Số bản ghi mỗi trang
+    
     /**
      * GET /api/items?page=1&per_page=10&search=keyword&status=active&sort=created_at&order=desc
      * Danh sách có tìm kiếm, lọc, sắp xếp và phân trang
@@ -15,9 +16,9 @@ class ItemController {
         $q = trim($_GET["search"] ?? "");
         $status = trim($_GET["status"] ?? "");
         
-        // Cập nhật các cột được phép sắp xếp theo bảng san_pham
+        // Cập nhật các cột được phép sắp xếp theo bảng san_pham (Đã loại bỏ quantity_on_hand)
         $sort = in_array($_GET["sort"] ?? "", [
-            "id", "sku", "name", "price", "quantity_on_hand", "created_at", "updated_at"
+            "id", "sku", "name", "price", "created_at", "updated_at"
         ]) ? $_GET["sort"] : "created_at";
         
         $order = strtoupper($_GET["order"] ?? "") === "ASC" ? "ASC" : "DESC";
@@ -25,7 +26,8 @@ class ItemController {
         $params = [];
         
         if ($q !== "") {
-            $where[] = "(i.name LIKE ? OR i.sku LIKE ? OR i.category LIKE ?)";
+            // Thay thế category bằng mo_ta
+            $where[] = "(i.name LIKE ? OR i.sku LIKE ? OR i.mo_ta LIKE ?)";
             $like = "%{$q}%";
             $params[] = $like; 
             $params[] = $like; 
@@ -37,11 +39,15 @@ class ItemController {
             $params[] = $status;
         }
         
-        // Sửa: JOIN với nha_cung_cap để lấy tên NCC thay vì lấy tên user
-        $sql = "SELECT i.*, n.name AS supplier_name
+        // JOIN với nha_cung_cap và kho_ton_kho, sử dụng hàm SUM() và GROUP BY
+        $sql = "SELECT i.*, 
+                       n.name AS supplier_name,
+                       COALESCE(SUM(k.so_luong_ton), 0) AS tong_ton_kho
                 FROM " . self::TABLE . " i
                 LEFT JOIN nha_cung_cap n ON n.id = i.supplier_id
+                LEFT JOIN kho_ton_kho k ON k.product_id = i.id
                 WHERE " . implode(" AND ", $where) . "
+                GROUP BY i.id
                 ORDER BY i.{$sort} {$order}";
                 
         require_once __DIR__ . "/../utils/Pagination.php";
