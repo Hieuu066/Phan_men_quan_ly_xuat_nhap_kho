@@ -168,6 +168,67 @@ switch ($segment) {
             };
         }
         break;
+    case "warehouses":
+        require_once __DIR__ . '/controllers/WarehouseController.php';
+        // Xử lý custom actions trước các route có ID
+        if ($action === "suggest-import") {
+            if ($method === 'GET') WarehouseController::suggestImport();
+            else Response::err("Method khong hop le.", 405);
+            break;
+        }
+        if ($action === "suggest-export") {
+            if ($method === 'GET') WarehouseController::suggestExport();
+            else Response::err("Method khong hop le.", 405);
+            break;
+        }
+
+        if ($id !== null) {
+            match ($method) {
+                "GET" => WarehouseController::show($id),
+                "PUT" => WarehouseController::update($id, $body),
+                "DELETE" => WarehouseController::destroy($id),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        } else {
+            match ($method) {
+                "GET" => WarehouseController::index(),
+                "POST" => WarehouseController::store($body),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        }
+        break;
+    case "warehouse-stock":
+        require_once __DIR__ . '/controllers/WarehouseStockController.php';
+        if ($id !== null) {
+            match ($method) {
+                "PUT" => WarehouseStockController::updateThreshold($id),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        } else {
+            match ($method) {
+                "GET" => WarehouseStockController::index(),
+                default => Response::err("Method khong hop le.", 405),
+            };
+        }
+        break;
+
+    case "alerts":
+        require_once __DIR__ . '/controllers/AlertController.php';
+        if ($method === 'GET' && $action === 'low-stock') {
+            AlertController::lowStock();
+        } else {
+            Response::err("Endpoint khong ton tai.", 404);
+        }
+        break;
+
+    case "transactions":
+        require_once __DIR__ . '/controllers/TransactionController.php';
+        if ($method === 'GET' && $id === null) {
+            TransactionController::index();
+        } else {
+            Response::err("Method khong hop le.", 405);
+        }
+        break;
     // ── THÊM RESOURCE MỚI Ở ĐÂY (copy pattern của "items") ──
     default:
         Response::err("API endpoint [{$method} /api/{$segment}] khong ton tai.", 404);
