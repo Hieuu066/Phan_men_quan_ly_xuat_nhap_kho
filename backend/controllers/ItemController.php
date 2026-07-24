@@ -16,7 +16,7 @@ class ItemController {
         $q = trim($_GET["search"] ?? "");
         $status = trim($_GET["status"] ?? "");
         
-        // Cập nhật các cột được phép sắp xếp theo bảng san_pham (Đã loại bỏ quantity_on_hand)
+        // Cập nhật các cột được phép sắp xếp theo bảng san_pham
         $sort = in_array($_GET["sort"] ?? "", [
             "id", "sku", "name", "price", "created_at", "updated_at"
         ]) ? $_GET["sort"] : "created_at";
@@ -26,7 +26,6 @@ class ItemController {
         $params = [];
         
         if ($q !== "") {
-            // Thay thế category bằng mo_ta
             $where[] = "(i.name LIKE ? OR i.sku LIKE ? OR i.mo_ta LIKE ?)";
             $like = "%{$q}%";
             $params[] = $like; 
@@ -77,7 +76,7 @@ class ItemController {
         Auth::required();
         $sku = trim($body["sku"] ?? "");
         $name = trim($body["name"] ?? "");
-        $category = trim($body["category"] ?? "");
+        $mo_ta = trim($body["mo_ta"] ?? "");
         $price = isset($body["price"]) ? (int)$body["price"] : null;
         
         $unit = trim($body["unit"] ?? "cái");
@@ -86,8 +85,8 @@ class ItemController {
         $status = in_array($body["status"] ?? "", ["active", "inactive"]) ? $body["status"] : "active";
 
         // 2. Validate dữ liệu bắt buộc
-        if ($sku === "" || $name === "" || $category === "" || $price === null) {
-            Response::err("Vui lòng nhập đủ các trường bắt buộc: sku, name, category, price.", 400);
+        if ($sku === "" || $name === "" || $price === null) {
+            Response::err("Vui lòng nhập đủ các trường bắt buộc: sku, name, price.", 400);
         }
         if (mb_strlen($name) < 2) {
             Response::err("Tên sản phẩm phải có ít nhất 2 ký tự.", 400);
@@ -99,7 +98,7 @@ class ItemController {
         try{
             $stmt = $db->prepare(
                 "INSERT INTO " . self::TABLE . " 
-                (sku, name, unit, category, supplier_id, min_stock, price, status, created_at) 
+                (sku, name, unit, mo_ta, supplier_id, min_stock, price, status, created_at) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())"
             );
             
@@ -107,7 +106,7 @@ class ItemController {
                 $sku, 
                 $name, 
                 $unit, 
-                $category, 
+                $mo_ta, 
                 $supplier_id, 
                 $min_stock, 
                 $price, 
@@ -145,7 +144,7 @@ class ItemController {
         $sku = trim($body["sku"] ?? $existing["sku"]);
         $name = trim($body["name"] ?? $existing["name"]);
         $unit = trim($body["unit"] ?? $existing["unit"]);
-        $category = trim($body["category"] ?? $existing["category"]);
+        $mo_ta = trim($body["mo_ta"] ?? $existing["mo_ta"]);
         
         // Lưu ý: supplier_id có thể là NULL, cần check isset thay vì empty
         $supplier_id = array_key_exists("supplier_id", $body) ? $body["supplier_id"] : $existing["supplier_id"];
@@ -154,8 +153,8 @@ class ItemController {
         $status = in_array($body["status"] ?? "", ["active", "inactive"]) ? $body["status"] : $existing["status"];
 
         // 3. Validate cơ bản
-        if ($sku === "" || $name === "" || $category === "") {
-            Response::err("Các trường sku, name, category không được để trống.", 400);
+        if ($sku === "" || $name === "") {
+            Response::err("Các trường sku, name không được để trống.", 400);
         }
         if (mb_strlen($name) < 2) {
             Response::err("Tên sản phẩm phải có ít nhất 2 ký tự.", 400);
@@ -166,12 +165,12 @@ class ItemController {
         try {
             $updateStmt = $db->prepare(
                 "UPDATE " . self::TABLE . " SET 
-                sku=?, name=?, unit=?, category=?, supplier_id=?, min_stock=?, price=?, status=?, updated_at=NOW()
+                sku=?, name=?, unit=?, mo_ta=?, supplier_id=?, price=?, status=?, updated_at=NOW()
                 WHERE id=?"
             );
             
             $updateStmt->execute([
-                $sku, $name, $unit, $category, $supplier_id, $min_stock, $price, $status, $id
+                $sku, $name, $unit, $mo_ta, $supplier_id, $price, $status, $id
             ]);
             
             Response::ok([
@@ -211,27 +210,51 @@ class ItemController {
     /** GET /api/items/export?format=csv — Xuất CSV */
     public static function export(): void {
         Auth::role("admin");
-        $db = getDB();
+        $db = getDB(); // Đảm bảo bạn gọi đúng hàm lấy kết nối PDO của mình
+        
+        // Cập nhật câu lệnh SQL: JOIN kho_ton_kho, dùng SUM()
         $stmt = $db->query(
-            "SELECT i.sku, i.name, i.category, i.price, i.quantity_on_hand, i.status, 
-                    n.name AS supplier_name, i.created_at
+            "SELECT 
+                i.sku, 
+                i.name, 
+                i.mo_ta, 
+                i.price, 
+                COALESCE(SUM(k.so_luong_ton), 0) AS tong_ton_kho, 
+                i.status, 
+                n.name AS supplier_name, 
+                i.created_at
             FROM " . self::TABLE . " i
             LEFT JOIN nha_cung_cap n ON n.id = i.supplier_id
+            LEFT JOIN kho_ton_kho k ON k.product_id = i.id
+            GROUP BY i.id
             ORDER BY i.id DESC"
         );
+        
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
         // Xuất file CSV
         header("Content-Type: text/csv; charset=UTF-8");
-        header("Content-Disposition: attachment; filename=export_" .
-        date("Ymd_His") . ".csv");
+        header("Content-Disposition: attachment; filename=export_" . date("Ymd_His") . ".csv");
         header("Cache-Control: no-cache");
+        
         $out = fopen("php://output", "w");
         fputs($out, "\xEF\xBB\xBF"); // BOM UTF-8 để Excel mở đúng tiếng Việt
-        fputcsv($out, ["SKU","Tên","Danh mục","Giá","Số lượng tồn","Trạng thái","Nhà cung cấp","Ngày tạo"]);
+        
+        fputcsv($out, ["SKU", "Tên", "Mô tả hàng hóa", "Giá", "Tổng số lượng tồn", "Trạng thái", "Nhà cung cấp", "Ngày tạo"]);
+        
         foreach ($rows as $r) {
-            fputcsv($out,
-            [$r["sku"],$r["name"],$r["category"],$r["price"],$r["quantity_on_hand"],$r["status"],$r["supplier_name"]?? "Không xác định",$r["created_at"]]);
+            fputcsv($out, [
+                $r["sku"],
+                $r["name"],
+                $r["mo_ta"],
+                $r["price"],
+                $r["tong_ton_kho"], // Ánh xạ đúng bí danh từ hàm SUM()
+                $r["status"],
+                $r["supplier_name"] ?? "Không xác định",
+                $r["created_at"]
+            ]);
         }
+        
         fclose($out);
         exit;
     }

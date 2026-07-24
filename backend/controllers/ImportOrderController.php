@@ -46,14 +46,14 @@ class ImportOrderController {
             Response::err("Không tìm thấy phiếu nhập", 404);
         }
 
-        // Bổ sung thuộc tính type theo api-spec.md
         $order['type'] = 'import';
 
-        // 2. Lấy danh sách chi tiết (JOIN với san_pham để lấy product_name và tính line_total)
+        // JOIN thêm kho_hang để lấy thông tin kho
         $stmtDetail = $db->prepare("
-            SELECT c.product_id, s.name AS product_name, c.quantity, c.unit_price, (c.quantity * c.unit_price) AS line_total
+            SELECT c.product_id, s.name AS product_name, c.kho_id, k.ten_kho, c.quantity, c.unit_price, (c.quantity * c.unit_price) AS line_total
             FROM chi_tiet_phieu_nhap c
             LEFT JOIN san_pham s ON c.product_id = s.id
+            LEFT JOIN kho_hang k ON c.kho_id = k.id
             WHERE c.phieu_nhap_id = ?
         ");
         $stmtDetail->execute([$id]);
@@ -67,6 +67,7 @@ class ImportOrderController {
 
         foreach ($order['details'] as &$detail) {
             $detail['product_id'] = (int)$detail['product_id'];
+            $detail['kho_id'] = (int)$detail['kho_id'];
             $detail['quantity'] = (int)$detail['quantity'];
             $detail['unit_price'] = (int)$detail['unit_price'];
             $detail['line_total'] = (int)$detail['line_total'];
@@ -90,8 +91,8 @@ class ImportOrderController {
             $createdBy = $_SESSION['user_id'] ?? 1; // Fallback nếu dev chưa gắn session
             $note = $body['note'] ?? null;
 
-            // 1. Insert đầu phiếu
-            $stmt = $db->prepare("INSERT INTO " . self::TABLE . " (supplier_id, created_by, note) VALUES (?, ?, ?)");
+            // 1. Insert đầu phiếu (tạm thời để total_amount = 0, sẽ update sau khi tính tổng chi tiết)
+            $stmt = $db->prepare("INSERT INTO " . self::TABLE . " (supplier_id, created_by, note, total_amount) VALUES (?, ?, ?, 0)");
             $stmt->execute([$body['supplier_id'], $createdBy, $note]);
             $orderId = $db->lastInsertId();
 
@@ -100,33 +101,100 @@ class ImportOrderController {
             $db->prepare("UPDATE " . self::TABLE . " SET code = ? WHERE id = ?")->execute([$code, $orderId]);
 
             // 3. Insert chi tiết phiếu
-            $stmtDetail = $db->prepare("INSERT INTO chi_tiet_phieu_nhap (phieu_nhap_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)");
-            
+            // Chuẩn bị các statement cần thiết
+            $stmtDetail = $db->prepare("INSERT INTO chi_tiet_phieu_nhap (phieu_nhap_id, product_id, kho_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)");
+            $stmtCheckCapacity = $db->prepare("
+                SELECT k.id, k.ten_kho, k.suc_chua, COALESCE(SUM(ktk.so_luong_ton), 0) AS current_stock
+                FROM kho_hang k
+                LEFT JOIN kho_ton_kho ktk ON k.id = ktk.kho_id
+                WHERE k.id = ? FOR UPDATE
+            ");
+            $stmtUpsertStock = $db->prepare("
+                INSERT INTO kho_ton_kho (kho_id, product_id, so_luong_ton) 
+                VALUES (?, ?, ?) 
+                ON DUPLICATE KEY UPDATE so_luong_ton = so_luong_ton + VALUES(so_luong_ton)
+            ");
+            $stmtFindAlternative = $db->prepare("
+                SELECT k.id AS kho_id, k.ten_kho, 
+                       (k.suc_chua - COALESCE((SELECT SUM(so_luong_ton) FROM kho_ton_kho WHERE kho_id = k.id), 0)) AS available_capacity
+                FROM kho_hang k
+                WHERE k.trang_thai = 'active' AND k.suc_chua IS NOT NULL
+                HAVING available_capacity >= ?
+                ORDER BY available_capacity DESC
+                LIMIT 3
+            ");
+            $totalAmount = 0;
+            // 2. Xử lý từng dòng chi tiết
             foreach ($body['details'] as $item) {
-                if (empty($item['product_id']) || empty($item['quantity']) || empty($item['unit_price'])) {
-                    throw new Exception("Thông tin chi tiết sản phẩm bị thiếu hoặc không hợp lệ", 400);
+                if (empty($item['product_id']) || empty($item['quantity']) || empty($item['unit_price']) || empty($item['kho_id'])) {
+                    throw new Exception("Thông tin chi tiết sản phẩm bị thiếu hoặc chưa chọn kho (cần có kho_id)", 400);
                 }
-                $stmtDetail->execute([$orderId, $item['product_id'], $item['quantity'], $item['unit_price']]);
-            }
 
+                $qty = (int)$item['quantity'];
+                $khoId = (int)$item['kho_id'];
+                $productId = (int)$item['product_id'];
+                $unitPrice = (int)$item['unit_price'];
+
+                // Cộng dồn tổng tiền
+                $totalAmount += ($qty * $unitPrice);
+
+                // Insert chi tiết
+                $stmtDetail->execute([$orderId, $productId, $khoId, $qty, $unitPrice]);
+
+                // 3. Kiểm tra sức chứa (Real-time bằng FOR UPDATE)
+                $stmtCheckCapacity->execute([$khoId]);
+                $khoInfo = $stmtCheckCapacity->fetch(PDO::FETCH_ASSOC);
+
+                if (!$khoInfo) {
+                    throw new Exception("Kho ID {$khoId} không tồn tại.", 404);
+                }
+
+                if ($khoInfo['suc_chua'] !== null) {
+                    $available = (int)$khoInfo['suc_chua'] - (int)$khoInfo['current_stock'];
+                    if ($available < $qty) {
+                        // Tìm kho thay thế
+                        $stmtFindAlternative->execute([$qty]);
+                        $alternatives = $stmtFindAlternative->fetchAll(PDO::FETCH_ASSOC);
+                        
+                        // Ném lỗi 409 để Rollback
+                        http_response_code(409);
+                        echo json_encode([
+                            "success" => false,
+                            "message" => "Không đủ chỗ trống trong kho {$khoInfo['ten_kho']} (Còn trống: {$available}).",
+                            "suggestions" => [
+                                "alternative_warehouses" => $alternatives
+                            ]
+                        ]);
+                        $db->rollBack();
+                        exit;
+                    }
+                }
+
+                // 4. Cập nhật tồn kho (Thay thế Trigger bằng UPSERT)
+                $stmtUpsertStock->execute([$khoId, $productId, $qty]);
+            }
+            $db->prepare("UPDATE " . self::TABLE . " SET total_amount = ? WHERE id = ?")->execute([$totalAmount, $orderId]);
             $db->commit();
 
+            // 5. Lấy lại thông tin phiếu vừa tạo để trả về Front-end
             $stmtGet = $db->prepare("SELECT * FROM " . self::TABLE . " WHERE id = ?");
             $stmtGet->execute([$orderId]);
             $createdOrder = $stmtGet->fetch(PDO::FETCH_ASSOC);
 
             $createdOrder['type'] = 'import';
             
+            // JOIN thêm kho_hang để lấy chi tiết kho cho response
             $stmtGetDetail = $db->prepare("
-                SELECT c.product_id, s.name AS product_name, c.quantity, c.unit_price, (c.quantity * c.unit_price) AS line_total
+                SELECT c.product_id, s.name AS product_name, c.kho_id, k.ten_kho, c.quantity, c.unit_price, (c.quantity * c.unit_price) AS line_total
                 FROM chi_tiet_phieu_nhap c
                 LEFT JOIN san_pham s ON c.product_id = s.id
+                LEFT JOIN kho_hang k ON c.kho_id = k.id
                 WHERE c.phieu_nhap_id = ?
             ");
             $stmtGetDetail->execute([$orderId]);
             $createdOrder['details'] = $stmtGetDetail->fetchAll(PDO::FETCH_ASSOC);
 
-            // Ép kiểu
+            // Ép kiểu chuẩn JSON để FE không bị lỗi parse String thành Number
             $createdOrder['id'] = (int)$createdOrder['id'];
             $createdOrder['supplier_id'] = (int)$createdOrder['supplier_id'];
             $createdOrder['created_by'] = (int)$createdOrder['created_by'];
@@ -134,12 +202,13 @@ class ImportOrderController {
 
             foreach ($createdOrder['details'] as &$detail) {
                 $detail['product_id'] = (int)$detail['product_id'];
+                $detail['kho_id'] = (int)$detail['kho_id'];
                 $detail['quantity'] = (int)$detail['quantity'];
                 $detail['unit_price'] = (int)$detail['unit_price'];
                 $detail['line_total'] = (int)$detail['line_total'];
             }
 
-            // Trả về đúng HTTP 201 Created
+            // Trả về đúng HTTP 201 Created cùng cấu trúc chuẩn
             http_response_code(201);
             echo json_encode([
                 "success" => true,

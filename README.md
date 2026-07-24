@@ -24,7 +24,7 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## 1. Giới thiệu dự án
 
-Đây là bộ khung khởi tạo cho phần mềm **Quản lý Xuất Nhập Kho** (quy mô dự án môn học 3 tuần). Hệ thống tập trung giải quyết bài toán cốt lõi:
+Đây là bộ khung khởi tạo cho phần mềm **Quản trị chuỗi cung ứng và kho hàng** (quy mô dự án môn học 3 tuần). Hệ thống tập trung giải quyết bài toán cốt lõi:
 
 - **Back-end API thuần PHP**: Router thủ công, có sẵn module **Xác thực người dùng (Auth)**, và **CRUD cơ bản**. Xử lý trực tiếp nghiệp vụ tại Controller.
 - **Front-end React 19 + Vite 8**: Layout sidebar phân quyền (2 vai trò: `admin`, `thu_kho`), trang Dashboard thống kê đơn giản, các trang danh sách dữ liệu.

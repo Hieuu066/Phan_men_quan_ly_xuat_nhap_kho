@@ -1,7 +1,6 @@
 <?php
 
 class ReportController {
-
     // 5.1. GET /api/stats/summary (Tổng quan Dashboard)
     public static function summary() {
         $db = getDB();
@@ -14,18 +13,29 @@ class ReportController {
             $stmt = $db->query("SELECT COUNT(id) FROM nha_cung_cap WHERE status = 'active'");
             $totalSuppliers = (int) $stmt->fetchColumn();
 
-            // Số mặt hàng sắp hết
-            $stmt = $db->query("SELECT COUNT(id) FROM san_pham WHERE quantity_on_hand < min_stock AND status = 'active'");
-            $lowStockItems = (int) $stmt->fetchColumn();
+            // Tổng số kho hàng (Thêm mới theo mô hình đa kho)
+            $stmt = $db->query("SELECT COUNT(id) FROM kho_hang WHERE trang_thai = 'active'");
+            $totalWarehouses = (int) $stmt->fetchColumn();
 
-            // Tổng giá trị tồn kho (Số lượng * Giá)
-            $stmt = $db->query("SELECT SUM(quantity_on_hand * price) FROM san_pham WHERE status = 'active'");
+            // Số mặt hàng sắp hết (Đếm số cặp kho - hàng hóa chạm ngưỡng)
+            $stmt = $db->query("SELECT COUNT(*) FROM kho_ton_kho WHERE so_luong_ton <= nguong_canh_bao");
+            $lowStockCount = (int) $stmt->fetchColumn();
+
+            // Tổng giá trị tồn kho (Tổng số lượng tồn ở mọi kho * Giá sản phẩm)
+            // Sử dụng COALESCE để trả về 0 nếu kho chưa có hàng hóa nào
+            $stmt = $db->query("
+                SELECT COALESCE(SUM(k.so_luong_ton * s.price), 0) 
+                FROM kho_ton_kho k
+                JOIN san_pham s ON k.product_id = s.id
+                WHERE s.status = 'active'
+            ");
             $totalInventoryValue = (int) $stmt->fetchColumn();
 
             Response::ok([
                 "total_products" => $totalProducts,
                 "total_suppliers" => $totalSuppliers,
-                "low_stock_items" => $lowStockItems,
+                "total_warehouses" => $totalWarehouses,
+                "low_stock_count" => $lowStockCount,
                 "total_inventory_value" => $totalInventoryValue
             ], "Lấy dữ liệu thống kê thành công");
 
@@ -34,22 +44,26 @@ class ReportController {
         }
     }
 
-    // 5.3. GET /api/reports/low-stock (Báo cáo hàng sắp hết)
     public static function lowStock() {
         $db = getDB();
         try {
+            // Lấy danh sách hàng sắp hết dựa trên từng kho hàng (kho_ton_kho)
+            // Ánh xạ lại tên cột để giữ tính tương thích với Front-end cũ
             $sql = "SELECT 
                         sp.id AS product_id, 
                         sp.sku, 
                         sp.name, 
-                        sp.category, 
-                        sp.quantity_on_hand, 
-                        sp.min_stock, 
+                        sp.mo_ta, 
+                        k.warehouse_id,
+                        k.so_luong_ton AS quantity_on_hand, --giao diện UI cũ của bạn (nếu có) vẫn map đúng key JSON mà không bị sập.
+                        k.nguong_canh_bao AS min_stock, 
                         ncc.name AS supplier_name 
-                    FROM san_pham sp 
+                    FROM kho_ton_kho k
+                    JOIN san_pham sp ON k.product_id = sp.id 
                     LEFT JOIN nha_cung_cap ncc ON sp.supplier_id = ncc.id 
-                    WHERE sp.quantity_on_hand < sp.min_stock AND sp.status = 'active'
-                    ORDER BY sp.quantity_on_hand ASC";
+                    WHERE k.so_luong_ton <= k.nguong_canh_bao 
+                    AND sp.status = 'active'
+                    ORDER BY k.so_luong_ton ASC";
 
             $stmt = $db->query($sql);
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -68,16 +82,16 @@ class ReportController {
             // Lấy tham số thời gian (mặc định từ 1970 đến hiện tại nếu không truyền)
             $fromDate = $_GET['from_date'] ?? '1970-01-01 00:00:00';
             $toDate = $_GET['to_date'] ?? date('Y-m-d 23:59:59');
-            $category = $_GET['category'] ?? '';
+            $moTa = $_GET['mo_ta'] ?? '';
 
-            // Sử dụng Subquery để đếm chính xác tổng số lượng nhập/xuất trong khoảng thời gian
+            // Sử dụng Subquery để đếm nhập/xuất và LEFT JOIN để lấy tổng tồn kho hiện tại
             $sql = "SELECT 
                         sp.id AS product_id,
                         sp.sku,
                         sp.name,
-                        sp.category,
+                        sp.mo_ta,
                         sp.unit,
-                        sp.quantity_on_hand AS closing_stock,
+                        COALESCE(SUM(k.so_luong_ton), 0) AS closing_stock,
                         
                         -- Tổng nhập trong kỳ
                         COALESCE((
@@ -96,6 +110,7 @@ class ReportController {
                         ), 0) AS total_export
                         
                     FROM san_pham sp
+                    LEFT JOIN kho_ton_kho k ON k.product_id = sp.id
                     WHERE sp.status = 'active'";
 
             $params = [
@@ -103,13 +118,14 @@ class ReportController {
                 ':to_date' => $toDate
             ];
 
-            // Lọc thêm theo category nếu có
-            if (!empty($category)) {
-                $sql .= " AND sp.category = :category";
-                $params[':category'] = $category;
+            // Lọc thêm theo mo_ta
+            if (!empty($moTa)) {
+                $sql .= " AND sp.mo_ta LIKE :mo_ta";
+                $params[':mo_ta'] = "%$moTa%";
             }
 
-            $sql .= " ORDER BY sp.id DESC";
+            // Bắt buộc GROUP BY vì có sử dụng hàm SUM(k.so_luong_ton)
+            $sql .= " GROUP BY sp.id ORDER BY sp.id DESC";
 
             $stmt = $db->prepare($sql);
             $stmt->execute($params);
