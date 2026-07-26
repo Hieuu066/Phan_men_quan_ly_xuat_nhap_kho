@@ -1,0 +1,228 @@
+diff --git a/frontend/src/pages/Transactions.jsx b/frontend/src/pages/Transactions.jsx
+index 4a6f6ab..47b6ed0 100644
+--- a/frontend/src/pages/Transactions.jsx
++++ b/frontend/src/pages/Transactions.jsx
+@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
+ import { productService } from '../services/product.service';
+ import { supplierService } from '../services/supplier.service';
+ import { orderService } from '../services/order.service';
++import { warehouseService } from '../services/warehouse.service';
++import { warehouseStockService } from '../services/warehouseStock.service';
+ import { formatCurrency, formatDate } from '../utils/format';
+ import { useToast } from '../hooks/useToast';
+ import { ToastContainer } from '../components/Feedback';
+@@ -19,29 +21,39 @@ function Transactions() {
+   const toast = useToast();
+   const [products, setProducts] = useState([]);
+   const [suppliers, setSuppliers] = useState([]);
++  const [warehouses, setWarehouses] = useState([]);
+   const [history, setHistory] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [submitting, setSubmitting] = useState(false);
+ 
+   const [type, setType] = useState('import');
+   const [supplierId, setSupplierId] = useState('');
++  const [khoId, setKhoId] = useState('');
+   const [nguoiNhan, setNguoiNhan] = useState('');
+   const [note, setNote] = useState('');
+ 
++  // Tồn kho THEO ĐÚNG KHO đang chọn (product_id -> so_luong_ton), tải lại mỗi khi đổi kho.
++  // Không dùng products[].quantity_on_hand vì trường đó không còn tồn tại từ khi
++  // hệ thống chuyển sang nhiều kho (tồn kho giờ tính riêng theo từng kho).
++  const [stockByProduct, setStockByProduct] = useState({});
++  const [stockLoading, setStockLoading] = useState(false);
++
+   const [cart, setCart] = useState([]);
+   const [lineProductId, setLineProductId] = useState('');
+   const [lineQty, setLineQty] = useState('');
+   const [lineUnitPrice, setLineUnitPrice] = useState('');
+ 
+   const loadAll = useCallback(async () => {
+-    const [prodRes, supRes, impRes, expRes] = await Promise.all([
++    const [prodRes, supRes, whRes, impRes, expRes] = await Promise.all([
+       productService.getAll({ per_page: 100 }),
+       supplierService.getAll({ per_page: 100 }),
++      warehouseService.getAll({ per_page: 100 }),
+       orderService.getImportOrders({ per_page: 20 }),
+       orderService.getExportOrders({ per_page: 20 }),
+     ]);
+     if (prodRes.success) setProducts(prodRes.data);
+     if (supRes.success) setSuppliers(supRes.data);
++    if (whRes.success) setWarehouses(whRes.data);
+ 
+     const imports = (impRes.success ? impRes.data : []).map((o) => ({ ...o, _type: 'Nhập kho' }));
+     const exports = (expRes.success ? expRes.data : []).map((o) => ({ ...o, _type: 'Xuất kho' }));
+@@ -51,6 +63,25 @@ function Transactions() {
+ 
+   useEffect(() => { loadAll().finally(() => setLoading(false)); }, [loadAll]);
+ 
++  // Mỗi khi đổi kho, tải lại tồn kho THEO ĐÚNG kho đó để hiển thị số chính xác
++  // trong ô chọn sản phẩm và để chặn xuất vượt tồn ngay trên giao diện.
++  useEffect(() => {
++    if (!khoId) { setStockByProduct({}); return; }
++    let cancelled = false;
++    setStockLoading(true);
++    warehouseStockService.getAll({ kho_id: khoId, per_page: 200 })
++      .then((res) => {
++        if (cancelled || !res.success) return;
++        const map = {};
++        res.data.forEach((row) => { map[row.product_id] = row.so_luong_ton; });
++        setStockByProduct(map);
++      })
++      .catch(() => { if (!cancelled) toast.error('Không tải được tồn kho của kho này.'); })
++      .finally(() => { if (!cancelled) setStockLoading(false); });
++    return () => { cancelled = true; };
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [khoId]);
++
+   const handleChangeType = (newType) => {
+     setType(newType);
+     setSupplierId('');
+@@ -58,7 +89,13 @@ function Transactions() {
+     setCart([]);
+   };
+ 
++  const handleChangeKho = (newKhoId) => {
++    setKhoId(newKhoId);
++    setCart([]); // Giỏ hàng đang tính theo tồn kho của kho cũ, đổi kho thì phải làm lại
++  };
++
+   const selectedProduct = products.find((p) => String(p.id) === String(lineProductId));
++  const stockAtSelectedKho = lineProductId ? (stockByProduct[lineProductId] ?? 0) : 0;
+ 
+   const handleAddLine = () => {
+     if (!lineProductId || !lineQty || !lineUnitPrice) {
+@@ -66,8 +103,8 @@ function Transactions() {
+       return;
+     }
+     const qty = Number(lineQty);
+-    if (type === 'export' && selectedProduct && qty > Number(selectedProduct.quantity_on_hand)) {
+-      toast.error(`"${selectedProduct.name}" chỉ còn ${selectedProduct.quantity_on_hand}, không đủ để xuất ${qty}.`);
++    if (type === 'export' && qty > stockAtSelectedKho) {
++      toast.error(`"${selectedProduct?.name}" chỉ còn ${stockAtSelectedKho} tại kho này, không đủ để xuất ${qty}.`);
+       return;
+     }
+     setCart((c) => [...c, {
+@@ -85,14 +122,16 @@ function Transactions() {
+ 
+   const cartTotal = cart.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
+ 
+-  const canGoStep2 = type === 'export' ? nguoiNhan.trim() !== '' : supplierId !== '';
++  const canGoStep2 = (type === 'export' ? nguoiNhan.trim() !== '' : supplierId !== '') && khoId !== '';
+   const canSubmit = cart.length > 0;
+ 
+   const handleSubmitOrder = async () => {
+     if (!canSubmit) return;
+     setSubmitting(true);
+     try {
+-      const details = cart.map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price }));
++      const details = cart.map(({ product_id, quantity, unit_price }) => ({
++        product_id, quantity, unit_price, kho_id: Number(khoId),
++      }));
+       if (type === 'import') {
+         await orderService.createImportOrder({ supplier_id: Number(supplierId), note, details });
+       } else {
+@@ -102,7 +141,14 @@ function Transactions() {
+       setSupplierId(''); setNguoiNhan(''); setNote(''); setCart([]);
+       await loadAll();
+     } catch (err) {
+-      toast.error(err.response?.data?.message || 'Không thể tạo phiếu. Vui lòng thử lại.');
++      const data = err.response?.data;
++      const alternatives = data?.suggestions?.alternative_warehouses;
++      if (alternatives?.length) {
++        const list = alternatives.map((w) => w.ten_kho).join(', ');
++        toast.error(`${data.message} Kho còn hàng gợi ý: ${list}.`);
++      } else {
++        toast.error(data?.message || 'Không thể tạo phiếu. Vui lòng thử lại.');
++      }
+     } finally {
+       setSubmitting(false);
+     }
+@@ -133,6 +179,14 @@ function Transactions() {
+             </div>
+           </div>
+ 
++          <div style={{ flex: '1 1 220px' }}>
++            <label style={{ display: 'block', fontSize: 13, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 6 }}>Kho</label>
++            <select value={khoId} onChange={(e) => handleChangeKho(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3', boxSizing: 'border-box' }}>
++              <option value="">-- Chọn kho --</option>
++              {warehouses.map(w => <option key={w.id} value={w.id}>{w.ten_kho}</option>)}
++            </select>
++          </div>
++
+           <div style={{ flex: '1 1 220px' }}>
+             <label style={{ display: 'block', fontSize: 13, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 6 }}>
+               {type === 'import' ? 'Nhà cung cấp' : 'Người / bộ phận nhận'}
+@@ -162,15 +216,25 @@ function Transactions() {
+ 
+         {canGoStep2 && (
+           <div style={{ paddingLeft: 42 }}>
+-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
++            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+               <select value={lineProductId} onChange={(e) => setLineProductId(e.target.value)} style={{ flex: '2 1 220px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }}>
+                 <option value="">-- Chọn sản phẩm --</option>
+-                {products.map(p => <option key={p.id} value={p.id}>{p.sku} - {p.name} (Tồn: {p.quantity_on_hand})</option>)}
++                {products.map(p => (
++                  <option key={p.id} value={p.id}>
++                    {p.sku} - {p.name} (Tồn tại kho này: {stockByProduct[p.id] ?? 0})
++                  </option>
++                ))}
+               </select>
+               <input type="number" placeholder="Số lượng" value={lineQty} onChange={(e) => setLineQty(e.target.value)} min="1" style={{ flex: '1 1 110px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }} />
+               <input type="number" placeholder="Đơn giá" value={lineUnitPrice} onChange={(e) => setLineUnitPrice(e.target.value)} min="0" style={{ flex: '1 1 130px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }} />
+               <button type="button" onClick={handleAddLine} className="btn btn-primary">+ Thêm vào phiếu</button>
+             </div>
++            {stockLoading && <p style={{ fontSize: 12, color: '#8a94a0', margin: '0 0 10px' }}>Đang tải tồn kho của kho này...</p>}
++            {type === 'export' && lineProductId && !stockLoading && (
++              <p style={{ fontSize: 12, color: stockAtSelectedKho > 0 ? '#8a94a0' : '#e74c3c', margin: '0 0 10px' }}>
++                Tồn hiện tại của "{selectedProduct?.name}" tại kho đã chọn: <strong>{stockAtSelectedKho}</strong>
++              </p>
++            )}
+ 
+             {cart.length > 0 && (
+               <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+diff --git a/frontend/src/services/warehouse.service.js b/frontend/src/services/warehouse.service.js
+new file mode 100644
+index 0000000..c590dce
+--- /dev/null
++++ b/frontend/src/services/warehouse.service.js
+@@ -0,0 +1,21 @@
++import api from "./api";
++
++const BASE = "/api/warehouses";
++
++export const warehouseService = {
++  async getAll(params = {}) {
++    return (await api.get(BASE, { params })).data;
++  },
++  async getById(id) {
++    return (await api.get(`${BASE}/${id}`)).data;
++  },
++  async create(data) {
++    return (await api.post(BASE, data)).data;
++  },
++  async update(id, data) {
++    return (await api.put(`${BASE}/${id}`, data)).data;
++  },
++  async remove(id) {
++    return (await api.delete(`${BASE}/${id}`)).data;
++  },
++};
+diff --git a/frontend/src/services/warehouseStock.service.js b/frontend/src/services/warehouseStock.service.js
+new file mode 100644
+index 0000000..b1a9079
+--- /dev/null
++++ b/frontend/src/services/warehouseStock.service.js
+@@ -0,0 +1,12 @@
++import api from "./api";
++
++const BASE = "/api/warehouse-stock";
++
++export const warehouseStockService = {
++  async getAll(params = {}) {
++    return (await api.get(BASE, { params })).data;
++  },
++  async updateThreshold(id, nguong_canh_bao) {
++    return (await api.put(`${BASE}/${id}`, { nguong_canh_bao })).data;
++  },
++};
