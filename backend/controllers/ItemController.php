@@ -81,7 +81,6 @@ class ItemController {
         
         $unit = trim($body["unit"] ?? "cái");
         $supplier_id = !empty($body["supplier_id"]) ? (int)$body["supplier_id"] : null;
-        $min_stock = isset($body["min_stock"]) ? (int)$body["min_stock"] : 0;
         $status = in_array($body["status"] ?? "", ["active", "inactive"]) ? $body["status"] : "active";
 
         // 2. Validate dữ liệu bắt buộc
@@ -98,8 +97,8 @@ class ItemController {
         try{
             $stmt = $db->prepare(
                 "INSERT INTO " . self::TABLE . " 
-                (sku, name, unit, mo_ta, supplier_id, min_stock, price, status, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+                (sku, name, unit, mo_ta, supplier_id, price, status, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())"
             );
             
             $stmt->execute([
@@ -108,7 +107,6 @@ class ItemController {
                 $unit, 
                 $mo_ta, 
                 $supplier_id, 
-                $min_stock, 
                 $price, 
                 $status
             ]);
@@ -148,7 +146,6 @@ class ItemController {
         
         // Lưu ý: supplier_id có thể là NULL, cần check isset thay vì empty
         $supplier_id = array_key_exists("supplier_id", $body) ? $body["supplier_id"] : $existing["supplier_id"];
-        $min_stock = isset($body["min_stock"]) ? (int)$body["min_stock"] : $existing["min_stock"];
         $price = isset($body["price"]) ? (int)$body["price"] : $existing["price"];
         $status = in_array($body["status"] ?? "", ["active", "inactive"]) ? $body["status"] : $existing["status"];
 

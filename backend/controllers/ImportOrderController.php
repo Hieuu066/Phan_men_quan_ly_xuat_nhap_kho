@@ -110,9 +110,11 @@ class ImportOrderController {
                 WHERE k.id = ? FOR UPDATE
             ");
             $stmtUpsertStock = $db->prepare("
-                INSERT INTO kho_ton_kho (kho_id, product_id, so_luong_ton) 
-                VALUES (?, ?, ?) 
-                ON DUPLICATE KEY UPDATE so_luong_ton = so_luong_ton + VALUES(so_luong_ton)
+                INSERT INTO kho_ton_kho (kho_id, product_id, supplier_id, so_luong_ton) 
+                VALUES (?, ?, ?, ?) 
+                ON DUPLICATE KEY UPDATE 
+                    so_luong_ton = so_luong_ton + VALUES(so_luong_ton),
+                    supplier_id = VALUES(supplier_id)
             ");
             $stmtFindAlternative = $db->prepare("
                 SELECT k.id AS kho_id, k.ten_kho, 
@@ -170,8 +172,8 @@ class ImportOrderController {
                     }
                 }
 
-                // 4. Cập nhật tồn kho (Thay thế Trigger bằng UPSERT)
-                $stmtUpsertStock->execute([$khoId, $productId, $qty]);
+                // 4. Cập nhật tồn kho (Thay thế Trigger bằng UPSERT) — ghi luôn nhà cung cấp của phiếu nhập này
+                $stmtUpsertStock->execute([$khoId, $productId, $body['supplier_id'], $qty]);
             }
             $db->prepare("UPDATE " . self::TABLE . " SET total_amount = ? WHERE id = ?")->execute([$totalAmount, $orderId]);
             $db->commit();

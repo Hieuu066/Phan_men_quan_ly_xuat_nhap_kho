@@ -27,12 +27,29 @@ class Pagination {
         $offset = ($page - 1) * $limit;
         
         // 3. Lấy dữ liệu trang hiện tại
-        $stmt = $db->prepare("{$baseSQL} LIMIT :lmt OFFSET :ofs");
-        foreach ($params as $k => $v) {
-        $stmt->bindValue(is_int($k) ? $k + 1 : $k, $v);
+        // QUAN TRỌNG: PDO không cho phép trộn lẫn placeholder kiểu positional (?)
+        // và named (:x) trong CÙNG 1 câu lệnh. Các Controller hiện dùng ? cho điều
+        // kiện WHERE, nên LIMIT/OFFSET ở đây cũng phải theo đúng kiểu đó — nếu không
+        // sẽ lỗi "SQLSTATE[HY093]: mixed named and positional parameters" ngay khi
+        // có filter/search (params không rỗng). Khi $params rỗng hoặc là named,
+        // vẫn dùng :lmt/:ofs như cũ để tương thích ngược.
+        $isPositional = $params !== [] && array_is_list($params);
+        if ($isPositional) {
+            $stmt = $db->prepare("{$baseSQL} LIMIT ? OFFSET ?");
+            $i = 1;
+            foreach ($params as $v) {
+                $stmt->bindValue($i++, $v);
+            }
+            $stmt->bindValue($i++, $limit, PDO::PARAM_INT);
+            $stmt->bindValue($i++, $offset, PDO::PARAM_INT);
+        } else {
+            $stmt = $db->prepare("{$baseSQL} LIMIT :lmt OFFSET :ofs");
+            foreach ($params as $k => $v) {
+                $stmt->bindValue($k, $v);
+            }
+            $stmt->bindValue(":lmt", $limit, PDO::PARAM_INT);
+            $stmt->bindValue(":ofs", $offset, PDO::PARAM_INT);
         }
-        $stmt->bindValue(":lmt", $limit, PDO::PARAM_INT);
-        $stmt->bindValue(":ofs", $offset, PDO::PARAM_INT);
         $stmt->execute();
         $data = $stmt->fetchAll();
 

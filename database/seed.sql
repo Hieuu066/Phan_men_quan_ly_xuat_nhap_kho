@@ -27,19 +27,23 @@ INSERT INTO kho_hang (ten_kho, dia_chi, suc_chua, trang_thai) VALUES
 ('Kho Chi nhánh TP.HCM', 'Khu công nghệ cao, Quận 9, TP.HCM', 5000, 'active');
 
 -- Bước 2.2: Phân bổ số lượng tồn kho chi tiết cho các sản phẩm vào từng kho
+-- LƯU Ý: bản seed gốc thiếu INSERT cho SP001-SP005 (5 sản phẩm đầu), nên trên CSDL
+-- trống, SP006 tự tăng ID thành 1 thay vì 6 như comment cũ giả định — toàn bộ dữ liệu
+-- bên dưới đã được remap lại đúng theo ID thực tế (SP006→1, SP007→2, SP008→3, SP009→4),
+-- đồng thời bổ sung thêm tồn kho cho SP010-SP015 (id 5-10, trước đó seed gốc cũng chưa
+-- có dòng nào) để đủ dữ liệu demo cho cả 10 sản phẩm và có ví dụ cảnh báo tồn thấp.
 INSERT INTO kho_ton_kho (kho_id, product_id, so_luong_ton, nguong_canh_bao) VALUES
 -- ===== TỒN KHO TẠI HÀ NỘI (kho_id = 1) =====
-(1, 1, 50, 20),  -- Bàn phím AKKO (ID 1) có 50 cái
-(1, 2, 200, 50), -- Chuột Logitech (ID 2) có 200 cái
-(1, 3, 0, 10),   -- Tai nghe (ID 3) hết hàng tại HN
-(1, 4, 35, 15),
-(1, 5, 40, 10),
-(1, 6, 15, 5),   -- Mainboard (ID 6) có 15 cái
-(1, 7, 25, 5),   -- CPU Intel (ID 7) có 25 cái
+(1, 1, 15, 5),   -- Mainboard ASUS (SP006, id=1) có 15 cái
+(1, 2, 25, 5),   -- CPU Intel i7 (SP007, id=2) có 25 cái
+(1, 5, 10, 5),   -- Card Gigabyte RTX 3060 (SP010, id=5) có 10 cái
+(1, 6, 20, 10),  -- Nguồn Corsair (SP011, id=6) có 20 cái tại HN
+(1, 8, 2, 10),   -- Tản nhiệt AIO (SP013, id=8) chỉ còn 2 cái — dưới ngưỡng, để test cảnh báo tồn thấp
+(1, 9, 8, 5),    -- Màn hình LG (SP014, id=9) có 8 cái tại HN
 
 -- ===== TỒN KHO TẠI TP.HCM (kho_id = 2) =====
-(2, 1, 30, 15),  -- Bàn phím AKKO (ID 1) có 30 cái. TỔNG CỘNG 2 KHO = 80
-(2, 3, 45, 15),  -- Tai nghe (ID 3) có 45 cái. TỔNG CỘNG 2 KHO = 45
-(2, 5, 10, 5),   -- Màn hình Dell (ID 5) có 10 cái. TỔNG CỘNG 2 KHO = 50
-(2, 8, 100, 20), -- RAM (ID 8) có 100 cái chỉ nằm ở HCM
-(2, 9, 60, 10);  -- SSD (ID 9) có 60 cái
+(2, 3, 100, 20), -- RAM Corsair (SP008, id=3) có 100 cái, chỉ nằm ở HCM
+(2, 4, 60, 10),  -- SSD Samsung (SP009, id=4) có 60 cái
+(2, 6, 5, 10),   -- Nguồn Corsair (SP011, id=6) chỉ còn 5 cái tại HCM — dưới ngưỡng, test cảnh báo theo từng kho riêng biệt
+(2, 7, 30, 10),  -- Vỏ case NZXT (SP012, id=7) có 30 cái
+(2, 9, 12, 5);   -- Màn hình LG (SP014, id=9) có 12 cái tại HCM

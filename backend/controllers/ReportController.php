@@ -48,14 +48,15 @@ class ReportController {
         $db = getDB();
         try {
             // Lấy danh sách hàng sắp hết dựa trên từng kho hàng (kho_ton_kho)
-            // Ánh xạ lại tên cột để giữ tính tương thích với Front-end cũ
+            // Ánh xạ lại tên cột (so_luong_ton -> quantity_on_hand, nguong_canh_bao -> min_stock)
+            // để giữ tính tương thích với Front-end cũ (nếu có) mà không bị sập.
             $sql = "SELECT 
                         sp.id AS product_id, 
                         sp.sku, 
                         sp.name, 
                         sp.mo_ta, 
-                        k.warehouse_id,
-                        k.so_luong_ton AS quantity_on_hand, --giao diện UI cũ của bạn (nếu có) vẫn map đúng key JSON mà không bị sập.
+                        k.kho_id AS warehouse_id,
+                        k.so_luong_ton AS quantity_on_hand,
                         k.nguong_canh_bao AS min_stock, 
                         ncc.name AS supplier_name 
                     FROM kho_ton_kho k
@@ -76,79 +77,22 @@ class ReportController {
     }
 
     // 5.2. GET /api/reports/inventory (Báo cáo xuất nhập tồn)
+    // Gọi Stored Procedure sp_bao_cao_xuat_nhap_ton (định nghĩa trong schema.sql)
+    // thay vì tự dựng câu SQL động trong PHP — vừa gọn code, vừa đúng khuyến nghị
+    // của đề bài CĐ05 (dùng Stored Procedure cho báo cáo tổng hợp truy vấn thường xuyên).
     public static function inventory() {
         $db = getDB();
         try {
-            // Lấy tham số thời gian (mặc định từ 1970 đến hiện tại nếu không truyền)
             $fromDate = $_GET['from_date'] ?? '1970-01-01 00:00:00';
             $toDate = $_GET['to_date'] ?? date('Y-m-d 23:59:59');
-            $moTa = $_GET['mo_ta'] ?? '';
-            $khoId = $_GET['kho_id'] ?? null;
+            $moTa = $_GET['mo_ta'] ?? null;
+            $khoId = !empty($_GET['kho_id']) ? (int)$_GET['kho_id'] : null;
 
-            // 1. Xử lý động cột hiển thị: Nếu có kho_id thì lấy thông tin kho, nếu không thì trả NULL
-            $selectKho = $khoId 
-                ? ":kho_id AS kho_id, (SELECT ten_kho FROM kho_hang WHERE id = :kho_id) AS ten_kho," 
-                : "NULL AS kho_id, NULL AS ten_kho,";
-            // 2. Xử lý động điều kiện cho các Subquery và JOIN
-            $khoConditionNhap = $khoId ? " AND ctpn.kho_id = :kho_id" : "";
-            $khoConditionXuat = $khoId ? " AND ctpx.kho_id = :kho_id" : "";
-            $khoConditionTon  = $khoId ? " AND k.kho_id = :kho_id" : "";
-            // Sử dụng Subquery để đếm nhập/xuất và LEFT JOIN để lấy tổng tồn kho hiện tại
-            $sql = "SELECT 
-                        sp.id AS product_id,
-                        sp.sku,
-                        sp.name,
-                        sp.mo_ta,
-                        sp.unit,
-                        {$selectKho}
-                        COALESCE(SUM(k.so_luong_ton), 0) AS closing_stock,
-                        
-                        -- Tổng nhập trong kỳ (Có lọc theo kho nếu được truyền)
-                        COALESCE((
-                            SELECT SUM(ctpn.quantity) 
-                            FROM chi_tiet_phieu_nhap ctpn 
-                            JOIN phieu_nhap pn ON ctpn.phieu_nhap_id = pn.id 
-                            WHERE ctpn.product_id = sp.id 
-                            AND pn.created_at BETWEEN :from_date AND :to_date
-                            {$khoConditionNhap}
-                        ), 0) AS total_import,
-                        
-                        -- Tổng xuất trong kỳ (Có lọc theo kho nếu được truyền)
-                        COALESCE((
-                            SELECT SUM(ctpx.quantity) 
-                            FROM chi_tiet_phieu_xuat ctpx 
-                            JOIN phieu_xuat px ON ctpx.phieu_xuat_id = px.id 
-                            WHERE ctpx.product_id = sp.id 
-                            AND px.created_at BETWEEN :from_date AND :to_date
-                            {$khoConditionXuat}
-                        ), 0) AS total_export
-                        
-                    FROM san_pham sp
-                    -- Chỉ JOIN với tồn kho của kho được chỉ định (nếu có)
-                    LEFT JOIN kho_ton_kho k ON k.product_id = sp.id {$khoConditionTon}
-                    WHERE sp.status = 'active'";
-
-            $params = [
-                ':from_date' => $fromDate,
-                ':to_date' => $toDate
-            ];
-
-            // Thêm tham số cho kho_id nếu có
-            if ($khoId) {
-                $params[':kho_id'] = $khoId;
-            }
-            // Lọc thêm theo mo_ta
-            if (!empty($moTa)) {
-                $sql .= " AND sp.mo_ta LIKE :mo_ta";
-                $params[':mo_ta'] = "%$moTa%";
-            }
-            // Bắt buộc GROUP BY vì có sử dụng hàm SUM(k.so_luong_ton)
-            $sql .= " GROUP BY sp.id ORDER BY sp.id DESC";
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute($params);
+            $stmt = $db->prepare("CALL sp_bao_cao_xuat_nhap_ton(?, ?, ?, ?)");
+            $stmt->execute([$fromDate, $toDate, $khoId, $moTa]);
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+            $stmt->closeCursor(); // Bắt buộc sau CALL để giải phóng kết nối cho câu lệnh tiếp theo
+
             // Ép kiểu chuẩn JSON để Front-end không bị lỗi parse Number
             foreach ($data as &$row) {
                 $row['product_id'] = (int)$row['product_id'];

@@ -1,0 +1,942 @@
+diff --git a/README.md b/README.md
+index 72dcf3d..454070e 100644
+--- a/README.md
++++ b/README.md
+@@ -1,38 +1,25 @@
+-<<<<<<< HEAD
+-# React + Vite
++# 📦 Hệ thống Quản lý Chuỗi cung ứng và Kho hàng
+ 
+-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+-
+-Currently, two official plugins are available:
+-
+-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+-
+-## React Compiler
+-
+-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+-
+-## Expanding the ESLint configuration
+-
+-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+-=======
+-# 📦 Phần mềm Quản lý Xuất Nhập Kho
+-
+-> Nhánh hiện tại: `develop` — bộ khung (skeleton) khởi tạo cho dự án Full-stack: **React (Vite)** ở Front-end và **PHP thuần (vanilla)** ở Back-end, kết nối **MySQL**.
++> Tên đề tài chính thức (theo phản hồi GVHD): **Hệ thống quản lý chuỗi cung ứng và kho hàng**.
++> Nhánh đang phát triển: `develop` — full-stack **React (Vite)** ở Front-end, **PHP thuần (vanilla)** ở Back-end, **MySQL** ở tầng dữ liệu, hỗ trợ **nhiều kho hàng**.
+ 
+ ---
+ 
+ ## 1. Giới thiệu dự án
+ 
+-Đây là bộ khung khởi tạo cho phần mềm **Quản trị chuỗi cung ứng và kho hàng** (quy mô dự án môn học 3 tuần). Hệ thống tập trung giải quyết bài toán cốt lõi:
++Phần mềm quản lý nghiệp vụ xuất/nhập/tồn kho theo **nhiều kho hàng**, có thống kê và cảnh báo tồn kho (dự án môn học, học phần Thiết kế web nâng cao). Hệ thống tập trung giải quyết:
++
++- **Back-end API thuần PHP**: Router thủ công (`backend/index.php`), module **Xác thực (Auth)**, và các Controller xử lý trực tiếp nghiệp vụ (không qua tầng Model).
++- **Front-end React 19 + Vite 8**: Layout sidebar phân quyền (2 vai trò: `admin`, `thu_kho`), Dashboard thống kê, các trang quản lý dữ liệu.
++- **Nghiệp vụ trọng tâm (Tiêu chí chấm điểm)**:
++  - Quản lý Sản phẩm, Nhà cung cấp, **Kho hàng** (nhiều kho).
++  - Quản lý Phiếu nhập / Phiếu xuất theo từng kho, tự động cập nhật tồn kho.
++  - Tra cứu tồn kho theo mặt hàng / theo từng kho; cảnh báo khi tồn dưới ngưỡng.
++  - Báo cáo tổng hợp xuất - nhập - tồn theo khoảng thời gian.
++  - Sử dụng **Transaction (`beginTransaction`/`commit`/`rollBack`)** kèm khoá dòng (`SELECT ... FOR UPDATE`) khi lập phiếu, đảm bảo đúng số lượng tồn khi có nhiều giao dịch đồng thời.
++  - Sử dụng **View** (`v_ton_kho_chi_tiet`) và **Stored Procedure** (`sp_bao_cao_xuat_nhap_ton`) cho các báo cáo tổng hợp truy vấn thường xuyên.
+ 
+-- **Back-end API thuần PHP**: Router thủ công, có sẵn module **Xác thực người dùng (Auth)**, và **CRUD cơ bản**. Xử lý trực tiếp nghiệp vụ tại Controller.
+-- **Front-end React 19 + Vite 8**: Layout sidebar phân quyền (2 vai trò: `admin`, `thu_kho`), trang Dashboard thống kê đơn giản, các trang danh sách dữ liệu.
+-- **Nghiệp vụ trọng tâm (Tiêu chí chấm điểm)**: 
+-  - Quản lý Sản phẩm, Nhà cung cấp.
+-  - Quản lý Phiếu nhập / Phiếu xuất (xuất nội bộ).
+-  - Sử dụng **Transaction (Commit/Rollback)** khi lưu phiếu.
+-  - Sử dụng **Trigger** trong MySQL để tự động cộng/trừ tồn kho.
++> **Lưu ý kiến trúc:** Việc cộng/trừ tồn kho hiện được xử lý **trong PHP** (UPSERT + khoá dòng `FOR UPDATE` tại `ImportOrderController`/`ExportOrderController`), **không dùng MySQL Trigger** — quyết định có chủ đích để tránh cộng/trừ 2 lần khi mô hình tồn kho chuyển từ 1-kho sang nhiều-kho. Nếu tiêu chí chấm điểm bắt buộc phải có Trigger, cần trao đổi lại với GVHD.
+ 
+ ---
+ 
+@@ -42,8 +29,7 @@ If you are developing a production application, we recommend using TypeScript wi
+ | Công nghệ | Phiên bản/Ghi chú |
+ |---|---|
+ | PHP thuần (Vanilla PHP) | Không dùng framework, tự viết router trong `index.php` |
+-| PDO (MySQL driver) | Kết nối CSDL, dùng Prepared Statement chống SQL Injection |
+-| Apache `.htaccess` | Điều hướng request về `index.php` |
++| PDO (MySQL driver) | Kết nối CSDL, dùng Prepared Statement chống SQL Injection (`PDO::ATTR_EMULATE_PREPARES = false`) |
+ | Session PHP (`$_SESSION`) | Xác thực đăng nhập |
+ | `password_hash` | Mã hoá mật khẩu Bcrypt |
+ 
+@@ -54,10 +40,11 @@ If you are developing a production application, we recommend using TypeScript wi
+ | Vite | ^8.1.1 |
+ | React Router DOM | ^7.18.1 |
+ | Axios | ^1.18.1 |
+-| Chart.js | ^4.5.1 (Biểu đồ cột đơn giản) |
++| Chart.js | ^4.5.1 |
+ 
+ ### Cơ sở dữ liệu
+-- **MySQL** (kết nối qua PDO, charset `utf8mb4`).
++- **MySQL** (kết nối qua PDO, charset `utf8mb4`, collation `utf8mb4_unicode_ci`).
++- Tên CSDL thật trong code: **`quanly_xuat_nhap_kho`** (xem `backend/config/database.php`).
+ 
+ ---
+ 
+@@ -68,42 +55,49 @@ Phan_men_quan_ly_xuat_nhap_kho/
+ ├── backend/                        # ===== BACK-END (PHP thuần) =====
+ │   ├── index.php                   # ⭐ FRONT CONTROLLER: Định tuyến (routing table)
+ │   ├── config/
+-│   │   └── database.php            # Kết nối PDO tới MySQL
+-│   ├── controllers/                # Nơi viết logic và query SQL TRỰC TIẾP (không qua Model)
++│   │   ├── database.php            # Kết nối PDO tới MySQL
++│   │   └── database.local.php      # (tuỳ chọn, không commit) Override port/host riêng từng máy
++│   ├── controllers/
+ │   │   ├── AuthController.php      
+-│   │   ├── ItemController.php      # CRUD mẫu (File chuẩn để copy làm module thật)
++│   │   ├── ItemController.php      # CRUD Sản phẩm
++│   │   ├── SupplierController.php  # CRUD Nhà cung cấp
++│   │   ├── UserController.php      
++│   │   ├── WarehouseController.php # CRUD Kho hàng + gợi ý kho khi nhập/xuất
++│   │   ├── WarehouseStockController.php # Tồn kho theo từng kho (dùng VIEW v_ton_kho_chi_tiet)
++│   │   ├── ImportOrderController.php    # Phiếu nhập — Transaction + UPSERT tồn kho
++│   │   ├── ExportOrderController.php    # Phiếu xuất — Transaction + khoá dòng + gợi ý kho thay thế
++│   │   ├── AlertController.php     # Cảnh báo tồn kho thấp
++│   │   ├── TransactionController.php    # Nhật ký giao dịch hợp nhất nhập+xuất
++│   │   ├── ReportController.php    # Báo cáo (gọi Stored Procedure cho báo cáo xuất-nhập-tồn)
+ │   │   └── StatsController.php     
+ │   ├── middleware/
+ │   │   └── Auth.php                # Phân quyền 2 vai trò: admin, thu_kho
+ │   ├── models/                     # ⚠️ LƯỢC BỎ: Không dùng phân tầng Model cho dự án 3 tuần.
+-│   │   └── (trống)                 
+-│   ├── utils/                       
++│   └── utils/
+ │       ├── Pagination.php          # Phân trang
+ │       └── Response.php            # Chuẩn hoá JSON trả về
+-│       # ⚠️ LƯỢC BỎ FileUpload.php, Sanitize.php (validate bằng if/else tại Controller)
+ │
+-├── database/                       # ===== DATABASE =====
+-│   ├── schema.sql                  # Script tạo bảng, chứa các TRIGGER cộng/trừ tồn kho
+-│   └── seed.sql                    # Dữ liệu mẫu
++├── database/
++│   ├── schema.sql                  # Bảng + VIEW v_ton_kho_chi_tiet + STORED PROCEDURE sp_bao_cao_xuat_nhap_ton
++│   └── seed.sql                    # Dữ liệu mẫu (10 sản phẩm, 2 kho)
+ │
+-├── docs/                           # ===== TÀI LIỆU =====
++├── docs/
+ │   ├── api-spec.md                 # Định nghĩa Request/Response API
+-│   └── erd.png                     # Sơ đồ quan hệ thực thể ERD 
++│   ├── architecture.png
++│   └── use-case.png
+ │
+ └── frontend/                       # ===== FRONT-END (React + Vite) =====
+-    ├── vite.config.js              
+     └── src/
+-        ├── main.jsx                # Entry point, cấu hình Router
++        ├── main.jsx / App.jsx      # Entry point, cấu hình Router
+         ├── components/
+-        │   ├── layout/
+-        │   │   └── Sidebar.jsx     # Menu điều hướng theo role (admin, thu_kho)
+-        │   └── ui/                  
+-        │       # ⚠️ LƯỢC BỎ FileUpload component. Chỉ dùng Modal, Pagination, Toast.
+-        ├── pages/                   
+-        │   ├── Dashboard.jsx       # Thống kê: Vài thẻ số liệu + 1 biểu đồ cột theo tháng
+-        │   └── ItemList.jsx        # Trang danh sách mẫu (không có nút xuất Excel/PDF)
+-        ├── services/               # Tầng gọi API bằng Axios
+-        └── styles/
++        │   └── ProtectedRoute.jsx  # Bảo vệ route theo trạng thái đăng nhập
++        ├── contexts/
++        │   └── AuthContext.jsx
++        ├── pages/
++        │   ├── Dashboard.jsx       # Thống kê + biểu đồ theo danh mục & tỉ lệ tồn kho
++        │   ├── Products.jsx / Suppliers.jsx / Users.jsx / Profile.jsx / Login.jsx
++        │   └── Transactions.jsx    # Lập phiếu nhập/xuất
++        └── services/                # Tầng gọi API bằng Axios
+ ```
+ 
+ ---
+@@ -111,48 +105,46 @@ Phan_men_quan_ly_xuat_nhap_kho/
+ ## 4. Hướng dẫn chạy
+ 
+ ### 4.1. Database (MySQL)
+-1. Tạo CSDL: `CREATE DATABASE quan_ly_xuat_nhap_kho CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+-2. Import script (sau khi code xong schema/trigger):
+-   ```bash
+-   mysql -u root -p quan_ly_xuat_nhap_kho < database/schema.sql
+-   mysql -u root -p quan_ly_xuat_nhap_kho < database/seed.sql
+-   ```
++Không cần tạo CSDL tay trước — `schema.sql` tự tạo bằng `CREATE DATABASE IF NOT EXISTS quanly_xuat_nhap_kho`:
++```bash
++mysql -u root -p < database/schema.sql
++mysql -u root -p quanly_xuat_nhap_kho < database/seed.sql
++```
+ 
+ ### 4.2. Back-end
+-1. Chạy server PHP tại thư mục `backend/`:
++1. Cấu hình CSDL trong `backend/config/database.php` (mặc định `localhost:3306`). Nếu máy bạn dùng cổng khác, tạo file `backend/config/database.local.php` để override riêng — **không sửa trực tiếp port mặc định trong `database.php`**.
++2. Chạy server PHP tại thư mục `backend/`:
+    ```bash
+    php -S localhost:8000
+    ```
+-2. Cấu hình CSDL trong `backend/config/database.php` khớp với localhost.
+ 
+ ### 4.3. Front-end
+-1. Cài đặt và chạy:
+-   ```bash
+-   cd frontend
+-   npm install
+-   npm run dev
+-   ```
++```bash
++cd frontend
++npm install
++npm run dev
++```
+ 
+ ---
+ 
+ ## 5. Danh sách công việc tiếp theo (To-do List)
+ 
+-Dưới đây là các phần cần hoàn thiện (đã được tinh gọn để sát với yêu cầu 3 tuần):
+-
+-### 🔴 Core Database (Bắt buộc để lấy điểm)
+-- **`database/schema.sql`**: Thiết kế ERD và tạo các bảng cốt lõi: `users`, `san_pham`, `nha_cung_cap`, `phieu_nhap`, `chi_tiet_phieu_nhap`, `phieu_xuat`, `chi_tiet_phieu_xuat`.
+-  - *Lưu ý:* Bỏ bảng Khách Hàng. Phiếu xuất chỉ cần 1 cột text `nguoi_nhan`.
+-- **Trigger**: Viết script Trigger tự động cộng `so_luong` vào `san_pham` khi thêm `chi_tiet_phieu_nhap`, và trừ `so_luong` khi thêm `chi_tiet_phieu_xuat`.
++### 🔴 Database
++- [x] Bảng `kho_hang`, `kho_ton_kho`; thêm `kho_id` vào `chi_tiet_phieu_nhap`/`chi_tiet_phieu_xuat`.
++- [x] Đổi `san_pham.category` → `mo_ta`; bỏ `quantity_on_hand`, `min_stock` khỏi `san_pham`.
++- [x] VIEW `v_ton_kho_chi_tiet` + STORED PROCEDURE `sp_bao_cao_xuat_nhap_ton`.
++- [ ] Cân nhắc thêm cột `supplier_id` vào `kho_ton_kho` (cho phép 1 sản phẩm có nhà cung cấp khác nhau theo từng kho — hiện chỉ có 1 nhà cung cấp cố định ở `san_pham`).
+ 
+ ### 🟠 Back-end API
+-- Đổi tên biến/module `Item` thành các thực thể thật (VD: `SanPhamController`).
+-- **Giao dịch (Transaction)**: Tại hàm tạo phiếu nhập/xuất trong Controller, **BẮT BUỘC** dùng `PDO::beginTransaction()`, `commit()`, và `rollBack()` để đảm bảo tính toàn vẹn dữ liệu.
+-- Phân quyền: Chỉ cấp phép 2 role là `admin` và `thu_kho` trong hệ thống.
+-- Validation: Validate trực tiếp bằng lệnh `if` ngay đầu các hàm trong Controller, không cần tạo Class riêng.
+-- Ảnh Sản phẩm/Avatar: Bỏ tính năng upload, gán cứng 1 link ảnh placeholder mặc định khi thêm mới.
++- [x] `WarehouseController` (CRUD kho hàng).
++- [x] `AlertController` (cảnh báo tồn thấp), `TransactionController` (nhật ký giao dịch).
++- [x] Transaction + khoá dòng (`FOR UPDATE`) khi lập phiếu nhập/xuất; gợi ý kho thay thế khi xuất thiếu hàng.
++- [ ] `GET /api/warehouse-stock`: bổ sung filter theo `product_id`, `supplier_id` (hiện chỉ có `keyword`, `kho_id`).
++- [ ] `POST /api/export-orders`: chế độ `warehouse_mode=auto` (hệ thống tự chọn kho phù hợp) — hiện bắt buộc chọn `kho_id` thủ công cho từng dòng.
+ 
+ ### 🟡 Front-end UI
+-- **Router & Auth**: Hoàn thiện luồng đăng nhập, gán token/session và bảo vệ các route private.
+-- **Trang Dashboard**: Xây dựng 1 biểu đồ cột (tổng số lượng nhập/xuất theo tháng) và 3-4 thẻ thống kê số liệu tổng. Không vẽ các biểu đồ phức tạp.
+-- **Tính năng xuất báo cáo**: Chỉ cần lập bảng hiển thị trên web + tính năng lọc theo khoảng thời gian (Từ ngày - Đến ngày). KHÔNG code chức năng xuất Excel/PDF.
+->>>>>>> cddf4a6a38642c35c2e27a0734f6962f51b5de56
++- [ ] Trang **Quản lý kho**: bảng kho hàng / hàng hóa / nhà cung cấp / số lượng tồn, form ngưỡng cảnh báo.
++- [ ] Bước **chọn kho** (thủ công/tự động) trong form lập phiếu nhập/xuất.
++- [ ] Bộ lọc **Nhật ký giao dịch** (mã phiếu, loại hình, khoảng ngày).
++- [ ] Đổi nhãn "Phân loại" → "Mô tả hàng hóa" ở trang Danh mục.
++- [ ] Biểu đồ biến động xuất/nhập theo thời gian ở Dashboard (hiện mới có biểu đồ theo danh mục & tỉ lệ tồn).
+diff --git a/backend/config/database.php b/backend/config/database.php
+index 4339f88..27d3895 100644
+--- a/backend/config/database.php
++++ b/backend/config/database.php
+@@ -22,7 +22,7 @@
+ */
+ function getDB(): PDO {
+     $host    = 'localhost';
+-    $port    = 3307; // Mặc định chuẩn XAMPP — đổi riêng qua database.local.php nếu máy bạn khác
++    $port    = 3306; // Mặc định chuẩn MySQL/XAMPP — đổi riêng qua database.local.php nếu máy bạn khác
+     $db      = 'quanly_xuat_nhap_kho';
+     $user    = 'root';
+     $pass    = '';
+diff --git a/backend/controllers/AlertController.php b/backend/controllers/AlertController.php
+index be5851a..1e1f7fc 100644
+--- a/backend/controllers/AlertController.php
++++ b/backend/controllers/AlertController.php
+@@ -10,26 +10,25 @@ class AlertController {
+         Auth::required();
+         $db = getDB();
+         
+-        // Câu truy vấn: Tìm các bản ghi trong kho_ton_kho có so_luong_ton <= nguong_canh_bao
+-        $sql = "SELECT ktk.id AS kho_ton_kho_id, 
+-                       k.id AS kho_id, k.ten_kho, 
+-                       sp.id AS product_id, sp.name AS product_name, sp.sku, 
+-                       ktk.so_luong_ton, ktk.nguong_canh_bao 
+-                FROM kho_ton_kho ktk
+-                JOIN kho_hang k ON ktk.kho_id = k.id
+-                JOIN san_pham sp ON ktk.product_id = sp.id
+-                WHERE ktk.so_luong_ton <= ktk.nguong_canh_bao";
++        // Câu truy vấn: Tìm các bản ghi có is_low_stock = 1 từ VIEW v_ton_kho_chi_tiet
++        // (VIEW đã gộp sẵn JOIN kho_hang + san_pham và tính sẵn cột is_low_stock)
++        $sql = "SELECT kho_ton_kho_id AS kho_ton_kho_id, 
++                       kho_id, ten_kho, 
++                       product_id, product_name, sku, 
++                       so_luong_ton, nguong_canh_bao 
++                FROM v_ton_kho_chi_tiet
++                WHERE is_low_stock = 1";
+                 
+         $params = [];
+ 
+         // Tính năng bổ sung: Hỗ trợ lọc cảnh báo theo kho cụ thể (nếu Front-end cần)
+         if (!empty($_GET['kho_id'])) {
+-            $sql .= " AND ktk.kho_id = ?";
++            $sql .= " AND kho_id = ?";
+             $params[] = (int)$_GET['kho_id'];
+         }
+ 
+         // Ưu tiên hiển thị những mặt hàng có tồn kho thấp nhất (nguy cấp nhất) lên trên cùng
+-        $sql .= " ORDER BY ktk.so_luong_ton ASC";
++        $sql .= " ORDER BY so_luong_ton ASC";
+                 
+         $stmt = $db->prepare($sql);
+         $stmt->execute($params);
+diff --git a/backend/controllers/ImportOrderController.php b/backend/controllers/ImportOrderController.php
+index c2444b8..23d0637 100644
+--- a/backend/controllers/ImportOrderController.php
++++ b/backend/controllers/ImportOrderController.php
+@@ -110,9 +110,11 @@ class ImportOrderController {
+                 WHERE k.id = ? FOR UPDATE
+             ");
+             $stmtUpsertStock = $db->prepare("
+-                INSERT INTO kho_ton_kho (kho_id, product_id, so_luong_ton) 
+-                VALUES (?, ?, ?) 
+-                ON DUPLICATE KEY UPDATE so_luong_ton = so_luong_ton + VALUES(so_luong_ton)
++                INSERT INTO kho_ton_kho (kho_id, product_id, supplier_id, so_luong_ton) 
++                VALUES (?, ?, ?, ?) 
++                ON DUPLICATE KEY UPDATE 
++                    so_luong_ton = so_luong_ton + VALUES(so_luong_ton),
++                    supplier_id = VALUES(supplier_id)
+             ");
+             $stmtFindAlternative = $db->prepare("
+                 SELECT k.id AS kho_id, k.ten_kho, 
+@@ -170,8 +172,8 @@ class ImportOrderController {
+                     }
+                 }
+ 
+-                // 4. Cập nhật tồn kho (Thay thế Trigger bằng UPSERT)
+-                $stmtUpsertStock->execute([$khoId, $productId, $qty]);
++                // 4. Cập nhật tồn kho (Thay thế Trigger bằng UPSERT) — ghi luôn nhà cung cấp của phiếu nhập này
++                $stmtUpsertStock->execute([$khoId, $productId, $body['supplier_id'], $qty]);
+             }
+             $db->prepare("UPDATE " . self::TABLE . " SET total_amount = ? WHERE id = ?")->execute([$totalAmount, $orderId]);
+             $db->commit();
+diff --git a/backend/controllers/ItemController.php b/backend/controllers/ItemController.php
+index 0ae8845..4006e1e 100644
+--- a/backend/controllers/ItemController.php
++++ b/backend/controllers/ItemController.php
+@@ -81,7 +81,6 @@ class ItemController {
+         
+         $unit = trim($body["unit"] ?? "cái");
+         $supplier_id = !empty($body["supplier_id"]) ? (int)$body["supplier_id"] : null;
+-        $min_stock = isset($body["min_stock"]) ? (int)$body["min_stock"] : 0;
+         $status = in_array($body["status"] ?? "", ["active", "inactive"]) ? $body["status"] : "active";
+ 
+         // 2. Validate dữ liệu bắt buộc
+@@ -98,8 +97,8 @@ class ItemController {
+         try{
+             $stmt = $db->prepare(
+                 "INSERT INTO " . self::TABLE . " 
+-                (sku, name, unit, mo_ta, supplier_id, min_stock, price, status, created_at) 
+-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())"
++                (sku, name, unit, mo_ta, supplier_id, price, status, created_at) 
++                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())"
+             );
+             
+             $stmt->execute([
+@@ -108,7 +107,6 @@ class ItemController {
+                 $unit, 
+                 $mo_ta, 
+                 $supplier_id, 
+-                $min_stock, 
+                 $price, 
+                 $status
+             ]);
+@@ -148,7 +146,6 @@ class ItemController {
+         
+         // Lưu ý: supplier_id có thể là NULL, cần check isset thay vì empty
+         $supplier_id = array_key_exists("supplier_id", $body) ? $body["supplier_id"] : $existing["supplier_id"];
+-        $min_stock = isset($body["min_stock"]) ? (int)$body["min_stock"] : $existing["min_stock"];
+         $price = isset($body["price"]) ? (int)$body["price"] : $existing["price"];
+         $status = in_array($body["status"] ?? "", ["active", "inactive"]) ? $body["status"] : $existing["status"];
+ 
+diff --git a/backend/controllers/ReportController.php b/backend/controllers/ReportController.php
+index 833fcac..a821a42 100644
+--- a/backend/controllers/ReportController.php
++++ b/backend/controllers/ReportController.php
+@@ -48,14 +48,15 @@ class ReportController {
+         $db = getDB();
+         try {
+             // Lấy danh sách hàng sắp hết dựa trên từng kho hàng (kho_ton_kho)
+-            // Ánh xạ lại tên cột để giữ tính tương thích với Front-end cũ
++            // Ánh xạ lại tên cột (so_luong_ton -> quantity_on_hand, nguong_canh_bao -> min_stock)
++            // để giữ tính tương thích với Front-end cũ (nếu có) mà không bị sập.
+             $sql = "SELECT 
+                         sp.id AS product_id, 
+                         sp.sku, 
+                         sp.name, 
+                         sp.mo_ta, 
+-                        k.warehouse_id,
+-                        k.so_luong_ton AS quantity_on_hand, --giao diện UI cũ của bạn (nếu có) vẫn map đúng key JSON mà không bị sập.
++                        k.kho_id AS warehouse_id,
++                        k.so_luong_ton AS quantity_on_hand,
+                         k.nguong_canh_bao AS min_stock, 
+                         ncc.name AS supplier_name 
+                     FROM kho_ton_kho k
+@@ -76,79 +77,22 @@ class ReportController {
+     }
+ 
+     // 5.2. GET /api/reports/inventory (Báo cáo xuất nhập tồn)
++    // Gọi Stored Procedure sp_bao_cao_xuat_nhap_ton (định nghĩa trong schema.sql)
++    // thay vì tự dựng câu SQL động trong PHP — vừa gọn code, vừa đúng khuyến nghị
++    // của đề bài CĐ05 (dùng Stored Procedure cho báo cáo tổng hợp truy vấn thường xuyên).
+     public static function inventory() {
+         $db = getDB();
+         try {
+-            // Lấy tham số thời gian (mặc định từ 1970 đến hiện tại nếu không truyền)
+             $fromDate = $_GET['from_date'] ?? '1970-01-01 00:00:00';
+             $toDate = $_GET['to_date'] ?? date('Y-m-d 23:59:59');
+-            $moTa = $_GET['mo_ta'] ?? '';
+-            $khoId = $_GET['kho_id'] ?? null;
++            $moTa = $_GET['mo_ta'] ?? null;
++            $khoId = !empty($_GET['kho_id']) ? (int)$_GET['kho_id'] : null;
+ 
+-            // 1. Xử lý động cột hiển thị: Nếu có kho_id thì lấy thông tin kho, nếu không thì trả NULL
+-            $selectKho = $khoId 
+-                ? ":kho_id AS kho_id, (SELECT ten_kho FROM kho_hang WHERE id = :kho_id) AS ten_kho," 
+-                : "NULL AS kho_id, NULL AS ten_kho,";
+-            // 2. Xử lý động điều kiện cho các Subquery và JOIN
+-            $khoConditionNhap = $khoId ? " AND ctpn.kho_id = :kho_id" : "";
+-            $khoConditionXuat = $khoId ? " AND ctpx.kho_id = :kho_id" : "";
+-            $khoConditionTon  = $khoId ? " AND k.kho_id = :kho_id" : "";
+-            // Sử dụng Subquery để đếm nhập/xuất và LEFT JOIN để lấy tổng tồn kho hiện tại
+-            $sql = "SELECT 
+-                        sp.id AS product_id,
+-                        sp.sku,
+-                        sp.name,
+-                        sp.mo_ta,
+-                        sp.unit,
+-                        {$selectKho}
+-                        COALESCE(SUM(k.so_luong_ton), 0) AS closing_stock,
+-                        
+-                        -- Tổng nhập trong kỳ (Có lọc theo kho nếu được truyền)
+-                        COALESCE((
+-                            SELECT SUM(ctpn.quantity) 
+-                            FROM chi_tiet_phieu_nhap ctpn 
+-                            JOIN phieu_nhap pn ON ctpn.phieu_nhap_id = pn.id 
+-                            WHERE ctpn.product_id = sp.id 
+-                            AND pn.created_at BETWEEN :from_date AND :to_date
+-                            {$khoConditionNhap}
+-                        ), 0) AS total_import,
+-                        
+-                        -- Tổng xuất trong kỳ (Có lọc theo kho nếu được truyền)
+-                        COALESCE((
+-                            SELECT SUM(ctpx.quantity) 
+-                            FROM chi_tiet_phieu_xuat ctpx 
+-                            JOIN phieu_xuat px ON ctpx.phieu_xuat_id = px.id 
+-                            WHERE ctpx.product_id = sp.id 
+-                            AND px.created_at BETWEEN :from_date AND :to_date
+-                            {$khoConditionXuat}
+-                        ), 0) AS total_export
+-                        
+-                    FROM san_pham sp
+-                    -- Chỉ JOIN với tồn kho của kho được chỉ định (nếu có)
+-                    LEFT JOIN kho_ton_kho k ON k.product_id = sp.id {$khoConditionTon}
+-                    WHERE sp.status = 'active'";
+-
+-            $params = [
+-                ':from_date' => $fromDate,
+-                ':to_date' => $toDate
+-            ];
+-
+-            // Thêm tham số cho kho_id nếu có
+-            if ($khoId) {
+-                $params[':kho_id'] = $khoId;
+-            }
+-            // Lọc thêm theo mo_ta
+-            if (!empty($moTa)) {
+-                $sql .= " AND sp.mo_ta LIKE :mo_ta";
+-                $params[':mo_ta'] = "%$moTa%";
+-            }
+-            // Bắt buộc GROUP BY vì có sử dụng hàm SUM(k.so_luong_ton)
+-            $sql .= " GROUP BY sp.id ORDER BY sp.id DESC";
+-
+-            $stmt = $db->prepare($sql);
+-            $stmt->execute($params);
++            $stmt = $db->prepare("CALL sp_bao_cao_xuat_nhap_ton(?, ?, ?, ?)");
++            $stmt->execute([$fromDate, $toDate, $khoId, $moTa]);
+             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+-            
++            $stmt->closeCursor(); // Bắt buộc sau CALL để giải phóng kết nối cho câu lệnh tiếp theo
++
+             // Ép kiểu chuẩn JSON để Front-end không bị lỗi parse Number
+             foreach ($data as &$row) {
+                 $row['product_id'] = (int)$row['product_id'];
+diff --git a/backend/controllers/TransactionController.php b/backend/controllers/TransactionController.php
+index b13c976..ccee94e 100644
+--- a/backend/controllers/TransactionController.php
++++ b/backend/controllers/TransactionController.php
+@@ -14,13 +14,13 @@ class TransactionController {
+         // Tạo một bảng ảo (Subquery) bằng UNION ALL chứa tất cả giao dịch
+         $baseSql = "
+             SELECT * FROM (
+-                SELECT id, code, 'import' AS type, total_amount, created_at, trang_thai,
++                SELECT id, code, 'import' AS type, total_amount, created_at,
+                        (SELECT name FROM nha_cung_cap WHERE id = phieu_nhap.supplier_id) AS counterparty
+                 FROM phieu_nhap
+                 
+                 UNION ALL
+                 
+-                SELECT id, code, 'export' AS type, total_amount, created_at, trang_thai,
++                SELECT id, code, 'export' AS type, total_amount, created_at,
+                        nguoi_nhan AS counterparty
+                 FROM phieu_xuat
+             ) AS transactions
+@@ -58,7 +58,9 @@ class TransactionController {
+         // Sắp xếp giao dịch mới nhất lên đầu
+         $baseSql .= " ORDER BY created_at DESC";
+         
+-        // Đưa vào class Pagination để tự động xử lý phân trang và trả về response
+-        Pagination::run($baseSql, $params, $page, $limit);
++        // Pagination::run() chỉ TRẢ VỀ mảng [data, meta], không tự gửi response,
++        // nên phải gán kết quả rồi gọi Response::paged() thì client mới nhận được dữ liệu.
++        $result = Pagination::run($baseSql, $params, $page, $limit);
++        Response::paged($result["data"], $result["meta"]);
+     }
+ }
+\ No newline at end of file
+diff --git a/backend/controllers/WarehouseController.php b/backend/controllers/WarehouseController.php
+index b10a3a3..6bf9a1c 100644
+--- a/backend/controllers/WarehouseController.php
++++ b/backend/controllers/WarehouseController.php
+@@ -50,4 +50,132 @@ class WarehouseController {
+         
+         Response::ok(["suitable_warehouses" => $data], "Gợi ý kho xuất thành công");
+     }
++
++    /**
++     * GET /api/warehouses?page=1&per_page=10&search=keyword&status=active
++     * Danh sách kho, tìm theo tên/địa chỉ, lọc theo trạng thái, có phân trang
++     */
++    public static function index() {
++        Auth::required();
++        $page = max(1, (int)($_GET["page"] ?? 1));
++        $limit = max(1, min(100, (int)($_GET["per_page"] ?? 10)));
++        $q = trim($_GET["search"] ?? "");
++        $status = trim($_GET["status"] ?? "");
++
++        $where = ["1=1"];
++        $params = [];
++        if ($q !== "") {
++            $where[] = "(ten_kho LIKE ? OR dia_chi LIKE ?)";
++            $like = "%{$q}%";
++            $params[] = $like;
++            $params[] = $like;
++        }
++        if ($status !== "") {
++            $where[] = "trang_thai = ?";
++            $params[] = $status;
++        }
++
++        $sql = "SELECT k.*,
++                       COALESCE((SELECT SUM(so_luong_ton) FROM kho_ton_kho WHERE kho_id = k.id), 0) AS tong_ton_kho
++                FROM " . self::TABLE . " k
++                WHERE " . implode(" AND ", $where) . "
++                ORDER BY k.id DESC";
++
++        $result = Pagination::run($sql, $params, $page, $limit);
++        Response::paged($result["data"], $result["meta"]);
++    }
++
++    /** GET /api/warehouses/:id */
++    public static function show(int $id) {
++        Auth::required();
++        $db = getDB();
++        $stmt = $db->prepare("SELECT * FROM " . self::TABLE . " WHERE id = ?");
++        $stmt->execute([$id]);
++        $row = $stmt->fetch(PDO::FETCH_ASSOC);
++        if (!$row) Response::err("Không tìm thấy kho hàng.", 404);
++        Response::ok($row);
++    }
++
++    /** POST /api/warehouses — Thêm kho mới */
++    public static function store(array $body) {
++        Auth::role("admin");
++        $tenKho = trim($body["ten_kho"] ?? "");
++        $diaChi = trim($body["dia_chi"] ?? "");
++        $sucChua = isset($body["suc_chua"]) ? (int)$body["suc_chua"] : 0;
++        $trangThai = in_array($body["trang_thai"] ?? "", ["active", "inactive"]) ? $body["trang_thai"] : "active";
++
++        if ($tenKho === "") {
++            Response::err("Vui lòng nhập tên kho.", 400);
++        }
++        if ($sucChua < 0) {
++            Response::err("Sức chứa không hợp lệ.", 400);
++        }
++
++        $db = getDB();
++        $stmt = $db->prepare(
++            "INSERT INTO " . self::TABLE . " (ten_kho, dia_chi, suc_chua, trang_thai, created_at)
++             VALUES (?, ?, ?, ?, NOW())"
++        );
++        $stmt->execute([$tenKho, $diaChi, $sucChua, $trangThai]);
++        $id = (int)$db->lastInsertId();
++
++        Response::ok(["id" => $id, "ten_kho" => $tenKho], "Thêm kho hàng thành công!", 201);
++    }
++
++    /** PUT /api/warehouses/:id — Cập nhật */
++    public static function update(int $id, array $body) {
++        Auth::role("admin");
++        $db = getDB();
++        $stmt = $db->prepare("SELECT * FROM " . self::TABLE . " WHERE id = ?");
++        $stmt->execute([$id]);
++        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
++        if (!$existing) Response::err("Không tìm thấy kho hàng.", 404);
++
++        $tenKho = trim($body["ten_kho"] ?? $existing["ten_kho"]);
++        $diaChi = trim($body["dia_chi"] ?? $existing["dia_chi"]);
++        $sucChua = isset($body["suc_chua"]) ? (int)$body["suc_chua"] : $existing["suc_chua"];
++        $trangThai = in_array($body["trang_thai"] ?? "", ["active", "inactive"]) ? $body["trang_thai"] : $existing["trang_thai"];
++
++        if ($tenKho === "") {
++            Response::err("Tên kho không được để trống.", 400);
++        }
++        if ($sucChua < 0) {
++            Response::err("Sức chứa không hợp lệ.", 400);
++        }
++
++        $updateStmt = $db->prepare(
++            "UPDATE " . self::TABLE . " SET ten_kho=?, dia_chi=?, suc_chua=?, trang_thai=?, updated_at=NOW() WHERE id=?"
++        );
++        $updateStmt->execute([$tenKho, $diaChi, $sucChua, $trangThai, $id]);
++
++        Response::ok(["id" => $id, "ten_kho" => $tenKho], "Cập nhật kho hàng thành công!");
++    }
++
++    /** DELETE /api/warehouses/:id */
++    public static function destroy(int $id) {
++        Auth::role("admin");
++        $db = getDB();
++        $stmt = $db->prepare("SELECT * FROM " . self::TABLE . " WHERE id = ?");
++        $stmt->execute([$id]);
++        if (!$stmt->fetch()) Response::err("Không tìm thấy kho hàng.", 404);
++
++        // Chặn xoá nếu kho vẫn còn hàng tồn — kho_ton_kho có ON DELETE CASCADE nên
++        // xoá thẳng sẽ âm thầm mất dữ liệu tồn kho nếu không kiểm tra trước.
++        $stockStmt = $db->prepare("SELECT COALESCE(SUM(so_luong_ton), 0) FROM kho_ton_kho WHERE kho_id = ?");
++        $stockStmt->execute([$id]);
++        if ((int)$stockStmt->fetchColumn() > 0) {
++            Response::err("Không thể xoá: kho vẫn còn hàng tồn. Hãy chuyển/xuất hết hàng hoặc đổi trạng thái thành 'inactive'.", 409);
++        }
++
++        try {
++            $db->prepare("DELETE FROM " . self::TABLE . " WHERE id = ?")->execute([$id]);
++            Response::ok(null, "Xoá kho hàng thành công!");
++        } catch (PDOException $e) {
++            // Kho đã từng phát sinh phiếu nhập/xuất (FK RESTRICT trên phieu_nhap/phieu_xuat)
++            if ($e->getCode() == 23000) {
++                Response::err("Không thể xoá vì kho đã phát sinh phiếu nhập/xuất. Hãy đổi trạng thái thành 'inactive'.", 409);
++            }
++            Response::err("Lỗi máy chủ: " . $e->getMessage(), 500);
++        }
++    }
+ }
+\ No newline at end of file
+diff --git a/backend/controllers/WarehouseStockController.php b/backend/controllers/WarehouseStockController.php
+index 52e7d5b..6c85f9f 100644
+--- a/backend/controllers/WarehouseStockController.php
++++ b/backend/controllers/WarehouseStockController.php
+@@ -12,20 +12,18 @@ class WarehouseStockController {
+         // Lấy tham số phân trang từ URL
+         $page = max(1, (int)($_GET["page"] ?? 1));
+         $limit = max(1, min(100, (int)($_GET["per_page"] ?? self::PER_PAGE)));
+-        // Xây dựng câu truy vấn cơ sở
+-        $sql = "SELECT ktk.id, ktk.kho_id, k.ten_kho, ktk.product_id, sp.name AS product_name, sp.sku, 
+-                       ncc.name AS supplier_name, ktk.so_luong_ton, ktk.nguong_canh_bao 
+-                FROM kho_ton_kho ktk
+-                JOIN kho_hang k ON ktk.kho_id = k.id
+-                JOIN san_pham sp ON ktk.product_id = sp.id
+-                LEFT JOIN nha_cung_cap ncc ON sp.supplier_id = ncc.id
++        // Xây dựng câu truy vấn cơ sở — dùng VIEW v_ton_kho_chi_tiet (đã gộp sẵn
++        // JOIN kho_hang + san_pham + nha_cung_cap) thay vì lặp lại JOIN thủ công.
++        $sql = "SELECT kho_ton_kho_id AS id, kho_id, ten_kho, product_id, product_name, sku,
++                       supplier_id, supplier_name, so_luong_ton, nguong_canh_bao
++                FROM v_ton_kho_chi_tiet
+                 WHERE 1=1";
+         
+         $params = [];
+ 
+         // Hỗ trợ tìm kiếm theo từ khóa (Tên sản phẩm hoặc SKU)
+         if (!empty($_GET['keyword'])) {
+-            $sql .= " AND (sp.name LIKE ? OR sp.sku LIKE ?)";
++            $sql .= " AND (product_name LIKE ? OR sku LIKE ?)";
+             $keyword = "%" . trim($_GET['keyword']) . "%";
+             $params[] = $keyword;
+             $params[] = $keyword;
+@@ -33,14 +31,28 @@ class WarehouseStockController {
+ 
+         // Hỗ trợ lọc chi tiết theo ID kho cụ thể
+         if (!empty($_GET['kho_id'])) {
+-            $sql .= " AND ktk.kho_id = ?";
++            $sql .= " AND kho_id = ?";
+             $params[] = (int)$_GET['kho_id'];
+         }
+ 
+-        $sql .= " ORDER BY ktk.id DESC";
++        // Lọc theo 1 sản phẩm cụ thể (VD: xem sản phẩm X đang tồn ở những kho nào)
++        if (!empty($_GET['product_id'])) {
++            $sql .= " AND product_id = ?";
++            $params[] = (int)$_GET['product_id'];
++        }
++
++        // Lọc theo nhà cung cấp (đã COALESCE sẵn trong VIEW: ưu tiên NCC riêng của lô hàng,
++        // nếu chưa có thì lấy NCC mặc định của sản phẩm)
++        if (!empty($_GET['supplier_id'])) {
++            $sql .= " AND supplier_id = ?";
++            $params[] = (int)$_GET['supplier_id'];
++        }
++
++        $sql .= " ORDER BY id DESC";
+         
+         // Tích hợp phân trang (Sử dụng class Pagination của hệ thống)
+-        Pagination::run($sql, $params, $page, $limit);
++        $result = Pagination::run($sql, $params, $page, $limit);
++        Response::paged($result["data"], $result["meta"]);
+     }
+ 
+     /**
+@@ -58,19 +70,19 @@ class WarehouseStockController {
+         
+         // Validation cơ bản
+         if (!isset($body['nguong_canh_bao'])) {
+-            Response::error(400, "Dữ liệu không hợp lệ: Vui lòng cung cấp 'nguong_canh_bao'");
++            Response::err("Dữ liệu không hợp lệ: Vui lòng cung cấp 'nguong_canh_bao'", 400);
+         }
+         
+         $nguong_canh_bao = (int)$body['nguong_canh_bao'];
+         if ($nguong_canh_bao < 0) {
+-            Response::error(400, "Ngưỡng cảnh báo không hợp lệ (Phải lớn hơn hoặc bằng 0)");
++            Response::err("Ngưỡng cảnh báo không hợp lệ (Phải lớn hơn hoặc bằng 0)", 400);
+         }
+ 
+         // Kiểm tra xem bản ghi tồn kho có thực sự tồn tại trong hệ thống hay không
+         $stmtCheck = $db->prepare("SELECT id FROM kho_ton_kho WHERE id = ?");
+         $stmtCheck->execute([$id]);
+         if (!$stmtCheck->fetch()) {
+-            Response::error(404, "Bản ghi tồn kho không tồn tại");
++            Response::err("Bản ghi tồn kho không tồn tại", 404);
+         }
+         
+         // Thực hiện cập nhật DB
+diff --git a/backend/index.php b/backend/index.php
+index 8b0f7f1..6799219 100644
+--- a/backend/index.php
++++ b/backend/index.php
+@@ -24,6 +24,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") { http_response_code(200); exit; }
+ // ── 3. Nạp dependencies ─────────────────────────────────────────
+ require_once __DIR__ . "/config/database.php";
+ require_once __DIR__ . "/utils/Response.php";
++require_once __DIR__ . "/utils/Pagination.php";
+ require_once __DIR__ . "/middleware/Auth.php";
+ 
+ // ── 4. Cấu hình Session bảo mật ─────────────────────────────────
+diff --git a/backend/utils/Pagination.php b/backend/utils/Pagination.php
+index 116de72..e8d8930 100644
+--- a/backend/utils/Pagination.php
++++ b/backend/utils/Pagination.php
+@@ -27,12 +27,29 @@ class Pagination {
+         $offset = ($page - 1) * $limit;
+         
+         // 3. Lấy dữ liệu trang hiện tại
+-        $stmt = $db->prepare("{$baseSQL} LIMIT :lmt OFFSET :ofs");
+-        foreach ($params as $k => $v) {
+-        $stmt->bindValue(is_int($k) ? $k + 1 : $k, $v);
++        // QUAN TRỌNG: PDO không cho phép trộn lẫn placeholder kiểu positional (?)
++        // và named (:x) trong CÙNG 1 câu lệnh. Các Controller hiện dùng ? cho điều
++        // kiện WHERE, nên LIMIT/OFFSET ở đây cũng phải theo đúng kiểu đó — nếu không
++        // sẽ lỗi "SQLSTATE[HY093]: mixed named and positional parameters" ngay khi
++        // có filter/search (params không rỗng). Khi $params rỗng hoặc là named,
++        // vẫn dùng :lmt/:ofs như cũ để tương thích ngược.
++        $isPositional = $params !== [] && array_is_list($params);
++        if ($isPositional) {
++            $stmt = $db->prepare("{$baseSQL} LIMIT ? OFFSET ?");
++            $i = 1;
++            foreach ($params as $v) {
++                $stmt->bindValue($i++, $v);
++            }
++            $stmt->bindValue($i++, $limit, PDO::PARAM_INT);
++            $stmt->bindValue($i++, $offset, PDO::PARAM_INT);
++        } else {
++            $stmt = $db->prepare("{$baseSQL} LIMIT :lmt OFFSET :ofs");
++            foreach ($params as $k => $v) {
++                $stmt->bindValue($k, $v);
++            }
++            $stmt->bindValue(":lmt", $limit, PDO::PARAM_INT);
++            $stmt->bindValue(":ofs", $offset, PDO::PARAM_INT);
+         }
+-        $stmt->bindValue(":lmt", $limit, PDO::PARAM_INT);
+-        $stmt->bindValue(":ofs", $offset, PDO::PARAM_INT);
+         $stmt->execute();
+         $data = $stmt->fetchAll();
+ 
+diff --git a/database/schema.sql b/database/schema.sql
+index 1a14d65..3b91729 100644
+--- a/database/schema.sql
++++ b/database/schema.sql
+@@ -2,6 +2,11 @@
+ CREATE DATABASE IF NOT EXISTS quanly_xuat_nhap_kho;
+ USE quanly_xuat_nhap_kho;
+ 
++-- Đảm bảo phiên làm việc dùng đúng utf8mb4/utf8mb4_unicode_ci khi tạo bảng/VIEW/PROCEDURE,
++-- tránh lỗi "Illegal mix of collations" nếu client import (mysql CLI/phpMyAdmin) không mặc
++-- định utf8mb4 — Stored Procedure/View "chụp" lại collation của phiên tại thời điểm tạo.
++SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
++
+ CREATE TABLE users (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     username VARCHAR(50) NOT NULL UNIQUE,
+@@ -77,6 +82,7 @@ CREATE TABLE IF NOT EXISTS kho_ton_kho (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     kho_id INT NOT NULL COMMENT 'Khóa ngoại trỏ đến bảng kho_hang',
+     product_id INT NOT NULL COMMENT 'Khóa ngoại trỏ đến bảng san_pham',
++    supplier_id INT NULL COMMENT 'Nhà cung cấp của lô hàng tồn tại kho này (có thể khác nhà cung cấp mặc định của sản phẩm) — được cập nhật tự động mỗi lần nhập kho',
+     so_luong_ton INT NOT NULL DEFAULT 0 COMMENT 'Số lượng tồn kho thực tế tại kho này',
+     nguong_canh_bao INT NOT NULL DEFAULT 10 COMMENT 'Ngưỡng cảnh báo tồn kho thấp cho sản phẩm tại kho này',
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+@@ -88,11 +94,13 @@ CREATE TABLE IF NOT EXISTS kho_ton_kho (
+     -- Tạo Index hỗ trợ truy vấn báo cáo và lọc tồn kho
+     INDEX idx_ktk_kho (kho_id),
+     INDEX idx_ktk_product (product_id),
++    INDEX idx_ktk_supplier (supplier_id),
+     INDEX idx_ktk_canh_bao (so_luong_ton, nguong_canh_bao),
+     
+     -- Khóa ngoại kết nối với các bảng liên quan
+     CONSTRAINT fk_ktk_kho FOREIGN KEY (kho_id) REFERENCES kho_hang(id) ON DELETE CASCADE,
+-    CONSTRAINT fk_ktk_san_pham FOREIGN KEY (product_id) REFERENCES san_pham(id) ON DELETE CASCADE
++    CONSTRAINT fk_ktk_san_pham FOREIGN KEY (product_id) REFERENCES san_pham(id) ON DELETE CASCADE,
++    CONSTRAINT fk_ktk_supplier FOREIGN KEY (supplier_id) REFERENCES nha_cung_cap(id) ON DELETE SET NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ 
+ -- ================================================================
+@@ -210,4 +218,84 @@ CREATE TABLE chi_tiet_phieu_xuat (
+ --     WHERE id = NEW.phieu_xuat_id;
+ -- END$$
+ 
+--- DELIMITER ;
+\ No newline at end of file
++-- DELIMITER ;
++
++-- ================================================================
++-- VIEW: v_ton_kho_chi_tiet
++-- Tổng hợp tồn kho hiện tại theo từng kho + sản phẩm + nhà cung cấp,
++-- dùng chung cho các báo cáo/tra cứu tồn kho được truy vấn thường xuyên
++-- (WarehouseStockController, AlertController) thay vì lặp lại cùng 1 bộ
++-- JOIN ở nhiều nơi trong code.
++-- ================================================================
++CREATE OR REPLACE VIEW v_ton_kho_chi_tiet AS
++SELECT
++    ktk.id AS kho_ton_kho_id,
++    k.id AS kho_id,
++    k.ten_kho,
++    k.trang_thai AS kho_trang_thai,
++    sp.id AS product_id,
++    sp.sku,
++    sp.name AS product_name,
++    sp.unit,
++    sp.price,
++    COALESCE(ktk.supplier_id, sp.supplier_id) AS supplier_id,
++    ncc.id AS resolved_supplier_id,
++    ncc.name AS supplier_name,
++    ktk.so_luong_ton,
++    ktk.nguong_canh_bao,
++    (ktk.so_luong_ton <= ktk.nguong_canh_bao) AS is_low_stock,
++    (ktk.so_luong_ton * sp.price) AS gia_tri_ton_kho
++FROM kho_ton_kho ktk
++JOIN kho_hang k ON ktk.kho_id = k.id
++JOIN san_pham sp ON ktk.product_id = sp.id
++LEFT JOIN nha_cung_cap ncc ON ncc.id = COALESCE(ktk.supplier_id, sp.supplier_id);
++
++-- ================================================================
++-- STORED PROCEDURE: sp_bao_cao_xuat_nhap_ton
++-- Báo cáo tổng hợp xuất - nhập - tồn theo khoảng thời gian (và theo kho
++-- nếu p_kho_id khác NULL). Dùng Stored Procedure (thay vì View) vì báo
++-- cáo này cần tham số động (from_date/to_date/kho_id) — View không hỗ
++-- trợ tham số hoá theo cách này.
++-- ================================================================
++DELIMITER $$
++CREATE PROCEDURE sp_bao_cao_xuat_nhap_ton(
++    IN p_from_date DATETIME,
++    IN p_to_date DATETIME,
++    IN p_kho_id INT,
++    IN p_mo_ta VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
++)
++BEGIN
++    SELECT
++        sp.id AS product_id,
++        sp.sku,
++        sp.name,
++        sp.mo_ta,
++        sp.unit,
++        p_kho_id AS kho_id,
++        (SELECT ten_kho FROM kho_hang WHERE id = p_kho_id) AS ten_kho,
++        COALESCE(SUM(k.so_luong_ton), 0) AS closing_stock,
++        COALESCE((
++            SELECT SUM(ctpn.quantity)
++            FROM chi_tiet_phieu_nhap ctpn
++            JOIN phieu_nhap pn ON ctpn.phieu_nhap_id = pn.id
++            WHERE ctpn.product_id = sp.id
++              AND pn.created_at BETWEEN p_from_date AND p_to_date
++              AND (p_kho_id IS NULL OR ctpn.kho_id = p_kho_id)
++        ), 0) AS total_import,
++        COALESCE((
++            SELECT SUM(ctpx.quantity)
++            FROM chi_tiet_phieu_xuat ctpx
++            JOIN phieu_xuat px ON ctpx.phieu_xuat_id = px.id
++            WHERE ctpx.product_id = sp.id
++              AND px.created_at BETWEEN p_from_date AND p_to_date
++              AND (p_kho_id IS NULL OR ctpx.kho_id = p_kho_id)
++        ), 0) AS total_export
++    FROM san_pham sp
++    LEFT JOIN kho_ton_kho k
++        ON k.product_id = sp.id AND (p_kho_id IS NULL OR k.kho_id = p_kho_id)
++    WHERE sp.status = 'active'
++      AND (p_mo_ta IS NULL OR p_mo_ta = '' OR sp.mo_ta LIKE CONCAT('%', p_mo_ta, '%'))
++    GROUP BY sp.id
++    ORDER BY sp.id DESC;
++END$$
++DELIMITER ;
+\ No newline at end of file
+diff --git a/database/seed.sql b/database/seed.sql
+index a41f8c9..b2d013b 100644
+--- a/database/seed.sql
++++ b/database/seed.sql
+@@ -27,19 +27,23 @@ INSERT INTO kho_hang (ten_kho, dia_chi, suc_chua, trang_thai) VALUES
+ ('Kho Chi nhánh TP.HCM', 'Khu công nghệ cao, Quận 9, TP.HCM', 5000, 'active');
+ 
+ -- Bước 2.2: Phân bổ số lượng tồn kho chi tiết cho các sản phẩm vào từng kho
++-- LƯU Ý: bản seed gốc thiếu INSERT cho SP001-SP005 (5 sản phẩm đầu), nên trên CSDL
++-- trống, SP006 tự tăng ID thành 1 thay vì 6 như comment cũ giả định — toàn bộ dữ liệu
++-- bên dưới đã được remap lại đúng theo ID thực tế (SP006→1, SP007→2, SP008→3, SP009→4),
++-- đồng thời bổ sung thêm tồn kho cho SP010-SP015 (id 5-10, trước đó seed gốc cũng chưa
++-- có dòng nào) để đủ dữ liệu demo cho cả 10 sản phẩm và có ví dụ cảnh báo tồn thấp.
+ INSERT INTO kho_ton_kho (kho_id, product_id, so_luong_ton, nguong_canh_bao) VALUES
+ -- ===== TỒN KHO TẠI HÀ NỘI (kho_id = 1) =====
+-(1, 1, 50, 20),  -- Bàn phím AKKO (ID 1) có 50 cái
+-(1, 2, 200, 50), -- Chuột Logitech (ID 2) có 200 cái
+-(1, 3, 0, 10),   -- Tai nghe (ID 3) hết hàng tại HN
+-(1, 4, 35, 15),
+-(1, 5, 40, 10),
+-(1, 6, 15, 5),   -- Mainboard (ID 6) có 15 cái
+-(1, 7, 25, 5),   -- CPU Intel (ID 7) có 25 cái
++(1, 1, 15, 5),   -- Mainboard ASUS (SP006, id=1) có 15 cái
++(1, 2, 25, 5),   -- CPU Intel i7 (SP007, id=2) có 25 cái
++(1, 5, 10, 5),   -- Card Gigabyte RTX 3060 (SP010, id=5) có 10 cái
++(1, 6, 20, 10),  -- Nguồn Corsair (SP011, id=6) có 20 cái tại HN
++(1, 8, 2, 10),   -- Tản nhiệt AIO (SP013, id=8) chỉ còn 2 cái — dưới ngưỡng, để test cảnh báo tồn thấp
++(1, 9, 8, 5),    -- Màn hình LG (SP014, id=9) có 8 cái tại HN
+ 
+ -- ===== TỒN KHO TẠI TP.HCM (kho_id = 2) =====
+-(2, 1, 30, 15),  -- Bàn phím AKKO (ID 1) có 30 cái. TỔNG CỘNG 2 KHO = 80
+-(2, 3, 45, 15),  -- Tai nghe (ID 3) có 45 cái. TỔNG CỘNG 2 KHO = 45
+-(2, 5, 10, 5),   -- Màn hình Dell (ID 5) có 10 cái. TỔNG CỘNG 2 KHO = 50
+-(2, 8, 100, 20), -- RAM (ID 8) có 100 cái chỉ nằm ở HCM
+-(2, 9, 60, 10);  -- SSD (ID 9) có 60 cái
+\ No newline at end of file
++(2, 3, 100, 20), -- RAM Corsair (SP008, id=3) có 100 cái, chỉ nằm ở HCM
++(2, 4, 60, 10),  -- SSD Samsung (SP009, id=4) có 60 cái
++(2, 6, 5, 10),   -- Nguồn Corsair (SP011, id=6) chỉ còn 5 cái tại HCM — dưới ngưỡng, test cảnh báo theo từng kho riêng biệt
++(2, 7, 30, 10),  -- Vỏ case NZXT (SP012, id=7) có 30 cái
++(2, 9, 12, 5);   -- Màn hình LG (SP014, id=9) có 12 cái tại HCM
+\ No newline at end of file

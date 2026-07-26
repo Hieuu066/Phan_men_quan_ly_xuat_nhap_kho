@@ -14,13 +14,13 @@ class TransactionController {
         // Tạo một bảng ảo (Subquery) bằng UNION ALL chứa tất cả giao dịch
         $baseSql = "
             SELECT * FROM (
-                SELECT id, code, 'import' AS type, total_amount, created_at, trang_thai,
+                SELECT id, code, 'import' AS type, total_amount, created_at,
                        (SELECT name FROM nha_cung_cap WHERE id = phieu_nhap.supplier_id) AS counterparty
                 FROM phieu_nhap
                 
                 UNION ALL
                 
-                SELECT id, code, 'export' AS type, total_amount, created_at, trang_thai,
+                SELECT id, code, 'export' AS type, total_amount, created_at,
                        nguoi_nhan AS counterparty
                 FROM phieu_xuat
             ) AS transactions
@@ -58,7 +58,9 @@ class TransactionController {
         // Sắp xếp giao dịch mới nhất lên đầu
         $baseSql .= " ORDER BY created_at DESC";
         
-        // Đưa vào class Pagination để tự động xử lý phân trang và trả về response
-        Pagination::run($baseSql, $params, $page, $limit);
+        // Pagination::run() chỉ TRẢ VỀ mảng [data, meta], không tự gửi response,
+        // nên phải gán kết quả rồi gọi Response::paged() thì client mới nhận được dữ liệu.
+        $result = Pagination::run($baseSql, $params, $page, $limit);
+        Response::paged($result["data"], $result["meta"]);
     }
 }

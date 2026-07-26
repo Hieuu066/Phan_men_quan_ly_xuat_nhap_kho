@@ -1,38 +1,25 @@
-<<<<<<< HEAD
-# React + Vite
+# 📦 Hệ thống Quản lý Chuỗi cung ứng và Kho hàng
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-=======
-# 📦 Phần mềm Quản lý Xuất Nhập Kho
-
-> Nhánh hiện tại: `develop` — bộ khung (skeleton) khởi tạo cho dự án Full-stack: **React (Vite)** ở Front-end và **PHP thuần (vanilla)** ở Back-end, kết nối **MySQL**.
+> Tên đề tài chính thức (theo phản hồi GVHD): **Hệ thống quản lý chuỗi cung ứng và kho hàng**.
+> Nhánh đang phát triển: `develop` — full-stack **React (Vite)** ở Front-end, **PHP thuần (vanilla)** ở Back-end, **MySQL** ở tầng dữ liệu, hỗ trợ **nhiều kho hàng**.
 
 ---
 
 ## 1. Giới thiệu dự án
 
-Đây là bộ khung khởi tạo cho phần mềm **Quản trị chuỗi cung ứng và kho hàng** (quy mô dự án môn học 3 tuần). Hệ thống tập trung giải quyết bài toán cốt lõi:
+Phần mềm quản lý nghiệp vụ xuất/nhập/tồn kho theo **nhiều kho hàng**, có thống kê và cảnh báo tồn kho (dự án môn học, học phần Thiết kế web nâng cao). Hệ thống tập trung giải quyết:
 
-- **Back-end API thuần PHP**: Router thủ công, có sẵn module **Xác thực người dùng (Auth)**, và **CRUD cơ bản**. Xử lý trực tiếp nghiệp vụ tại Controller.
-- **Front-end React 19 + Vite 8**: Layout sidebar phân quyền (2 vai trò: `admin`, `thu_kho`), trang Dashboard thống kê đơn giản, các trang danh sách dữ liệu.
-- **Nghiệp vụ trọng tâm (Tiêu chí chấm điểm)**: 
-  - Quản lý Sản phẩm, Nhà cung cấp.
-  - Quản lý Phiếu nhập / Phiếu xuất (xuất nội bộ).
-  - Sử dụng **Transaction (Commit/Rollback)** khi lưu phiếu.
-  - Sử dụng **Trigger** trong MySQL để tự động cộng/trừ tồn kho.
+- **Back-end API thuần PHP**: Router thủ công (`backend/index.php`), module **Xác thực (Auth)**, và các Controller xử lý trực tiếp nghiệp vụ (không qua tầng Model).
+- **Front-end React 19 + Vite 8**: Layout sidebar phân quyền (2 vai trò: `admin`, `thu_kho`), Dashboard thống kê, các trang quản lý dữ liệu.
+- **Nghiệp vụ trọng tâm (Tiêu chí chấm điểm)**:
+  - Quản lý Sản phẩm, Nhà cung cấp, **Kho hàng** (nhiều kho).
+  - Quản lý Phiếu nhập / Phiếu xuất theo từng kho, tự động cập nhật tồn kho.
+  - Tra cứu tồn kho theo mặt hàng / theo từng kho; cảnh báo khi tồn dưới ngưỡng.
+  - Báo cáo tổng hợp xuất - nhập - tồn theo khoảng thời gian.
+  - Sử dụng **Transaction (`beginTransaction`/`commit`/`rollBack`)** kèm khoá dòng (`SELECT ... FOR UPDATE`) khi lập phiếu, đảm bảo đúng số lượng tồn khi có nhiều giao dịch đồng thời.
+  - Sử dụng **View** (`v_ton_kho_chi_tiet`) và **Stored Procedure** (`sp_bao_cao_xuat_nhap_ton`) cho các báo cáo tổng hợp truy vấn thường xuyên.
+
+> **Lưu ý kiến trúc:** Việc cộng/trừ tồn kho hiện được xử lý **trong PHP** (UPSERT + khoá dòng `FOR UPDATE` tại `ImportOrderController`/`ExportOrderController`), **không dùng MySQL Trigger** — quyết định có chủ đích để tránh cộng/trừ 2 lần khi mô hình tồn kho chuyển từ 1-kho sang nhiều-kho. Nếu tiêu chí chấm điểm bắt buộc phải có Trigger, cần trao đổi lại với GVHD.
 
 ---
 
@@ -42,8 +29,7 @@ If you are developing a production application, we recommend using TypeScript wi
 | Công nghệ | Phiên bản/Ghi chú |
 |---|---|
 | PHP thuần (Vanilla PHP) | Không dùng framework, tự viết router trong `index.php` |
-| PDO (MySQL driver) | Kết nối CSDL, dùng Prepared Statement chống SQL Injection |
-| Apache `.htaccess` | Điều hướng request về `index.php` |
+| PDO (MySQL driver) | Kết nối CSDL, dùng Prepared Statement chống SQL Injection (`PDO::ATTR_EMULATE_PREPARES = false`) |
 | Session PHP (`$_SESSION`) | Xác thực đăng nhập |
 | `password_hash` | Mã hoá mật khẩu Bcrypt |
 
@@ -54,10 +40,11 @@ If you are developing a production application, we recommend using TypeScript wi
 | Vite | ^8.1.1 |
 | React Router DOM | ^7.18.1 |
 | Axios | ^1.18.1 |
-| Chart.js | ^4.5.1 (Biểu đồ cột đơn giản) |
+| Chart.js | ^4.5.1 |
 
 ### Cơ sở dữ liệu
-- **MySQL** (kết nối qua PDO, charset `utf8mb4`).
+- **MySQL** (kết nối qua PDO, charset `utf8mb4`, collation `utf8mb4_unicode_ci`).
+- Tên CSDL thật trong code: **`quanly_xuat_nhap_kho`** (xem `backend/config/database.php`).
 
 ---
 
@@ -68,42 +55,49 @@ Phan_men_quan_ly_xuat_nhap_kho/
 ├── backend/                        # ===== BACK-END (PHP thuần) =====
 │   ├── index.php                   # ⭐ FRONT CONTROLLER: Định tuyến (routing table)
 │   ├── config/
-│   │   └── database.php            # Kết nối PDO tới MySQL
-│   ├── controllers/                # Nơi viết logic và query SQL TRỰC TIẾP (không qua Model)
+│   │   ├── database.php            # Kết nối PDO tới MySQL
+│   │   └── database.local.php      # (tuỳ chọn, không commit) Override port/host riêng từng máy
+│   ├── controllers/
 │   │   ├── AuthController.php      
-│   │   ├── ItemController.php      # CRUD mẫu (File chuẩn để copy làm module thật)
+│   │   ├── ItemController.php      # CRUD Sản phẩm
+│   │   ├── SupplierController.php  # CRUD Nhà cung cấp
+│   │   ├── UserController.php      
+│   │   ├── WarehouseController.php # CRUD Kho hàng + gợi ý kho khi nhập/xuất
+│   │   ├── WarehouseStockController.php # Tồn kho theo từng kho (dùng VIEW v_ton_kho_chi_tiet)
+│   │   ├── ImportOrderController.php    # Phiếu nhập — Transaction + UPSERT tồn kho
+│   │   ├── ExportOrderController.php    # Phiếu xuất — Transaction + khoá dòng + gợi ý kho thay thế
+│   │   ├── AlertController.php     # Cảnh báo tồn kho thấp
+│   │   ├── TransactionController.php    # Nhật ký giao dịch hợp nhất nhập+xuất
+│   │   ├── ReportController.php    # Báo cáo (gọi Stored Procedure cho báo cáo xuất-nhập-tồn)
 │   │   └── StatsController.php     
 │   ├── middleware/
 │   │   └── Auth.php                # Phân quyền 2 vai trò: admin, thu_kho
 │   ├── models/                     # ⚠️ LƯỢC BỎ: Không dùng phân tầng Model cho dự án 3 tuần.
-│   │   └── (trống)                 
-│   ├── utils/                       
+│   └── utils/
 │       ├── Pagination.php          # Phân trang
 │       └── Response.php            # Chuẩn hoá JSON trả về
-│       # ⚠️ LƯỢC BỎ FileUpload.php, Sanitize.php (validate bằng if/else tại Controller)
 │
-├── database/                       # ===== DATABASE =====
-│   ├── schema.sql                  # Script tạo bảng, chứa các TRIGGER cộng/trừ tồn kho
-│   └── seed.sql                    # Dữ liệu mẫu
+├── database/
+│   ├── schema.sql                  # Bảng + VIEW v_ton_kho_chi_tiet + STORED PROCEDURE sp_bao_cao_xuat_nhap_ton
+│   └── seed.sql                    # Dữ liệu mẫu (10 sản phẩm, 2 kho)
 │
-├── docs/                           # ===== TÀI LIỆU =====
+├── docs/
 │   ├── api-spec.md                 # Định nghĩa Request/Response API
-│   └── erd.png                     # Sơ đồ quan hệ thực thể ERD 
+│   ├── architecture.png
+│   └── use-case.png
 │
 └── frontend/                       # ===== FRONT-END (React + Vite) =====
-    ├── vite.config.js              
     └── src/
-        ├── main.jsx                # Entry point, cấu hình Router
+        ├── main.jsx / App.jsx      # Entry point, cấu hình Router
         ├── components/
-        │   ├── layout/
-        │   │   └── Sidebar.jsx     # Menu điều hướng theo role (admin, thu_kho)
-        │   └── ui/                  
-        │       # ⚠️ LƯỢC BỎ FileUpload component. Chỉ dùng Modal, Pagination, Toast.
-        ├── pages/                   
-        │   ├── Dashboard.jsx       # Thống kê: Vài thẻ số liệu + 1 biểu đồ cột theo tháng
-        │   └── ItemList.jsx        # Trang danh sách mẫu (không có nút xuất Excel/PDF)
-        ├── services/               # Tầng gọi API bằng Axios
-        └── styles/
+        │   └── ProtectedRoute.jsx  # Bảo vệ route theo trạng thái đăng nhập
+        ├── contexts/
+        │   └── AuthContext.jsx
+        ├── pages/
+        │   ├── Dashboard.jsx       # Thống kê + biểu đồ theo danh mục & tỉ lệ tồn kho
+        │   ├── Products.jsx / Suppliers.jsx / Users.jsx / Profile.jsx / Login.jsx
+        │   └── Transactions.jsx    # Lập phiếu nhập/xuất
+        └── services/                # Tầng gọi API bằng Axios
 ```
 
 ---
@@ -111,48 +105,46 @@ Phan_men_quan_ly_xuat_nhap_kho/
 ## 4. Hướng dẫn chạy
 
 ### 4.1. Database (MySQL)
-1. Tạo CSDL: `CREATE DATABASE quan_ly_xuat_nhap_kho CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-2. Import script (sau khi code xong schema/trigger):
-   ```bash
-   mysql -u root -p quan_ly_xuat_nhap_kho < database/schema.sql
-   mysql -u root -p quan_ly_xuat_nhap_kho < database/seed.sql
-   ```
+Không cần tạo CSDL tay trước — `schema.sql` tự tạo bằng `CREATE DATABASE IF NOT EXISTS quanly_xuat_nhap_kho`:
+```bash
+mysql -u root -p < database/schema.sql
+mysql -u root -p quanly_xuat_nhap_kho < database/seed.sql
+```
 
 ### 4.2. Back-end
-1. Chạy server PHP tại thư mục `backend/`:
+1. Cấu hình CSDL trong `backend/config/database.php` (mặc định `localhost:3306`). Nếu máy bạn dùng cổng khác, tạo file `backend/config/database.local.php` để override riêng — **không sửa trực tiếp port mặc định trong `database.php`**.
+2. Chạy server PHP tại thư mục `backend/`:
    ```bash
    php -S localhost:8000
    ```
-2. Cấu hình CSDL trong `backend/config/database.php` khớp với localhost.
 
 ### 4.3. Front-end
-1. Cài đặt và chạy:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ---
 
 ## 5. Danh sách công việc tiếp theo (To-do List)
 
-Dưới đây là các phần cần hoàn thiện (đã được tinh gọn để sát với yêu cầu 3 tuần):
-
-### 🔴 Core Database (Bắt buộc để lấy điểm)
-- **`database/schema.sql`**: Thiết kế ERD và tạo các bảng cốt lõi: `users`, `san_pham`, `nha_cung_cap`, `phieu_nhap`, `chi_tiet_phieu_nhap`, `phieu_xuat`, `chi_tiet_phieu_xuat`.
-  - *Lưu ý:* Bỏ bảng Khách Hàng. Phiếu xuất chỉ cần 1 cột text `nguoi_nhan`.
-- **Trigger**: Viết script Trigger tự động cộng `so_luong` vào `san_pham` khi thêm `chi_tiet_phieu_nhap`, và trừ `so_luong` khi thêm `chi_tiet_phieu_xuat`.
+### 🔴 Database
+- [x] Bảng `kho_hang`, `kho_ton_kho`; thêm `kho_id` vào `chi_tiet_phieu_nhap`/`chi_tiet_phieu_xuat`.
+- [x] Đổi `san_pham.category` → `mo_ta`; bỏ `quantity_on_hand`, `min_stock` khỏi `san_pham`.
+- [x] VIEW `v_ton_kho_chi_tiet` + STORED PROCEDURE `sp_bao_cao_xuat_nhap_ton`.
+- [ ] Cân nhắc thêm cột `supplier_id` vào `kho_ton_kho` (cho phép 1 sản phẩm có nhà cung cấp khác nhau theo từng kho — hiện chỉ có 1 nhà cung cấp cố định ở `san_pham`).
 
 ### 🟠 Back-end API
-- Đổi tên biến/module `Item` thành các thực thể thật (VD: `SanPhamController`).
-- **Giao dịch (Transaction)**: Tại hàm tạo phiếu nhập/xuất trong Controller, **BẮT BUỘC** dùng `PDO::beginTransaction()`, `commit()`, và `rollBack()` để đảm bảo tính toàn vẹn dữ liệu.
-- Phân quyền: Chỉ cấp phép 2 role là `admin` và `thu_kho` trong hệ thống.
-- Validation: Validate trực tiếp bằng lệnh `if` ngay đầu các hàm trong Controller, không cần tạo Class riêng.
-- Ảnh Sản phẩm/Avatar: Bỏ tính năng upload, gán cứng 1 link ảnh placeholder mặc định khi thêm mới.
+- [x] `WarehouseController` (CRUD kho hàng).
+- [x] `AlertController` (cảnh báo tồn thấp), `TransactionController` (nhật ký giao dịch).
+- [x] Transaction + khoá dòng (`FOR UPDATE`) khi lập phiếu nhập/xuất; gợi ý kho thay thế khi xuất thiếu hàng.
+- [ ] `GET /api/warehouse-stock`: bổ sung filter theo `product_id`, `supplier_id` (hiện chỉ có `keyword`, `kho_id`).
+- [ ] `POST /api/export-orders`: chế độ `warehouse_mode=auto` (hệ thống tự chọn kho phù hợp) — hiện bắt buộc chọn `kho_id` thủ công cho từng dòng.
 
 ### 🟡 Front-end UI
-- **Router & Auth**: Hoàn thiện luồng đăng nhập, gán token/session và bảo vệ các route private.
-- **Trang Dashboard**: Xây dựng 1 biểu đồ cột (tổng số lượng nhập/xuất theo tháng) và 3-4 thẻ thống kê số liệu tổng. Không vẽ các biểu đồ phức tạp.
-- **Tính năng xuất báo cáo**: Chỉ cần lập bảng hiển thị trên web + tính năng lọc theo khoảng thời gian (Từ ngày - Đến ngày). KHÔNG code chức năng xuất Excel/PDF.
->>>>>>> cddf4a6a38642c35c2e27a0734f6962f51b5de56
+- [ ] Trang **Quản lý kho**: bảng kho hàng / hàng hóa / nhà cung cấp / số lượng tồn, form ngưỡng cảnh báo.
+- [ ] Bước **chọn kho** (thủ công/tự động) trong form lập phiếu nhập/xuất.
+- [ ] Bộ lọc **Nhật ký giao dịch** (mã phiếu, loại hình, khoảng ngày).
+- [ ] Đổi nhãn "Phân loại" → "Mô tả hàng hóa" ở trang Danh mục.
+- [ ] Biểu đồ biến động xuất/nhập theo thời gian ở Dashboard (hiện mới có biểu đồ theo danh mục & tỉ lệ tồn).
