@@ -1,0 +1,160 @@
+// ============================================================
+// ERD - Phần mềm Quản lý Xuất Nhập Kho (đa kho)
+// Sinh từ database/schema.sql - dán trực tiếp vào dbdiagram.io
+// để xuất ảnh ERD có ký hiệu quan hệ (crow's foot) đầy đủ.
+// ============================================================
+
+Enum trang_thai_enum {
+  active
+  inactive
+}
+
+Enum user_role_enum {
+  admin
+  user
+}
+
+// ─────────────── DỮ LIỆU GỐC (MASTER DATA) ───────────────
+
+Table users {
+  id int [pk, increment]
+  username varchar(50) [not null, unique]
+  password varchar(255) [not null, note: 'Hash Bcrypt']
+  full_name varchar(100) [not null]
+  role user_role_enum [not null, default: 'user']
+  status trang_thai_enum [not null, default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table nha_cung_cap {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  phone varchar(20)
+  email varchar(100)
+  address text
+  status trang_thai_enum [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table san_pham {
+  id int [pk, increment]
+  sku varchar(50) [not null, unique]
+  name varchar(255) [not null]
+  unit varchar(50) [default: 'cái']
+  mo_ta text [note: 'Mô tả sản phẩm']
+  supplier_id int [note: 'NCC mặc định - NULL nếu chưa gán']
+  price int [not null]
+  status trang_thai_enum [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table kho_hang {
+  id int [pk, increment]
+  ten_kho varchar(255) [not null]
+  dia_chi text
+  suc_chua int [not null, default: 0, note: 'Sức chứa tối đa']
+  trang_thai trang_thai_enum [not null, default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+// ─────────────── BẢNG TRUNG GIAN (N-N) ───────────────
+
+Table kho_ton_kho {
+  id int [pk, increment]
+  kho_id int [not null]
+  product_id int [not null]
+  supplier_id int [note: 'NCC của lô hàng - có thể khác NCC mặc định của sản phẩm']
+  so_luong_ton int [not null, default: 0]
+  nguong_canh_bao int [not null, default: 10]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+
+  Indexes {
+    (kho_id, product_id) [unique, name: 'uq_kho_sanpham']
+  }
+}
+
+// ─────────────── CHỨNG TỪ NHẬP KHO ───────────────
+
+Table phieu_nhap {
+  id int [pk, increment]
+  code varchar(20) [unique, note: 'VD: PN000108 - sinh sau khi insert']
+  supplier_id int
+  created_by int [not null]
+  note text
+  total_amount bigint [not null, default: 0]
+  created_at timestamp [default: `now()`]
+}
+
+Table chi_tiet_phieu_nhap {
+  id int [pk, increment]
+  phieu_nhap_id int [not null]
+  product_id int [not null]
+  kho_id int [not null]
+  quantity int [not null, note: 'CHECK > 0']
+  unit_price bigint [not null, note: 'Giá tại thời điểm nhập - CHECK >= 0']
+  line_total bigint [note: 'GENERATED = quantity * unit_price']
+}
+
+// ─────────────── CHỨNG TỪ XUẤT KHO ───────────────
+
+Table phieu_xuat {
+  id int [pk, increment]
+  code varchar(20) [unique, note: 'VD: PX000045 - sinh sau khi insert']
+  nguoi_nhan varchar(150) [not null, note: 'Trường văn bản, không phải FK']
+  created_by int [not null]
+  note text
+  total_amount bigint [not null, default: 0]
+  created_at timestamp [default: `now()`]
+}
+
+Table chi_tiet_phieu_xuat {
+  id int [pk, increment]
+  phieu_xuat_id int [not null]
+  product_id int [not null]
+  kho_id int [not null]
+  quantity int [not null, note: 'CHECK > 0']
+  unit_price bigint [not null, note: 'CHECK >= 0']
+  line_total bigint [note: 'GENERATED = quantity * unit_price']
+}
+
+// ─────────────── QUAN HỆ (FOREIGN KEYS) ───────────────
+
+Ref: san_pham.supplier_id > nha_cung_cap.id [delete: set null]
+
+Ref: kho_ton_kho.kho_id > kho_hang.id [delete: cascade]
+Ref: kho_ton_kho.product_id > san_pham.id [delete: cascade]
+Ref: kho_ton_kho.supplier_id > nha_cung_cap.id [delete: set null]
+
+Ref: phieu_nhap.supplier_id > nha_cung_cap.id [delete: set null]
+Ref: phieu_nhap.created_by > users.id
+
+Ref: chi_tiet_phieu_nhap.phieu_nhap_id > phieu_nhap.id
+Ref: chi_tiet_phieu_nhap.product_id > san_pham.id
+Ref: chi_tiet_phieu_nhap.kho_id > kho_hang.id
+
+Ref: phieu_xuat.created_by > users.id
+
+Ref: chi_tiet_phieu_xuat.phieu_xuat_id > phieu_xuat.id
+Ref: chi_tiet_phieu_xuat.product_id > san_pham.id
+Ref: chi_tiet_phieu_xuat.kho_id > kho_hang.id
+
+// ─────────────── NHÓM BẢNG (chỉ để hiển thị đẹp hơn) ───────────────
+
+TableGroup "Du lieu goc" {
+  users
+  nha_cung_cap
+  san_pham
+  kho_hang
+}
+
+TableGroup "Chung tu Nhap - Xuat" {
+  phieu_nhap
+  chi_tiet_phieu_nhap
+  phieu_xuat
+  chi_tiet_phieu_xuat
+}

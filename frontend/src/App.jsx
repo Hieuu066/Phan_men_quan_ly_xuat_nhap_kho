@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
+import Warehouses from './pages/Warehouses';
 import Transactions from './pages/Transactions';
 import Suppliers from './pages/Suppliers';
 import Users from './pages/Users';
@@ -27,6 +28,7 @@ function Layout({ children }) {
   const navItems = [
     { path: '/dashboard', icon: '📊', label: 'Bảng Điều Khiển' },
     { path: '/products', icon: '📦', label: 'Kho Linh Kiện' },
+    { path: '/warehouses', icon: '🏢', label: 'Quản Lý Kho' },
     { path: '/suppliers', icon: '🏭', label: 'Nhà Cung Cấp' },
     { path: '/transactions', icon: '🔄', label: 'Mua / Bán Linh Kiện' },
     ...(user?.role === 'admin' ? [{ path: '/users', icon: '👤', label: 'Người Dùng Hệ Thống' }] : []),
@@ -88,6 +90,7 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
       <Route path="/products" element={<ProtectedRoute><Layout><Products /></Layout></ProtectedRoute>} />
+      <Route path="/warehouses" element={<ProtectedRoute><Layout><Warehouses /></Layout></ProtectedRoute>} />
       <Route path="/suppliers" element={<ProtectedRoute><Layout><Suppliers /></Layout></ProtectedRoute>} />
       <Route path="/transactions" element={<ProtectedRoute><Layout><Transactions /></Layout></ProtectedRoute>} />
       <Route path="/users" element={<ProtectedRoute roles={["admin"]}><Layout><Users /></Layout></ProtectedRoute>} />
