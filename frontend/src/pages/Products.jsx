@@ -30,12 +30,14 @@ function Products() {
 
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
+  const [moTa, setMoTa] = useState('');
   const [price, setPrice] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [editMoTa, setEditMoTa] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editSupplierId, setEditSupplierId] = useState('');
 
@@ -69,12 +71,12 @@ function Products() {
     setSubmitting(true);
     try {
       const res = await productService.create({
-        sku, name,
+        sku, name, mo_ta: moTa,
         price: Number(price),
         supplier_id: supplierId || null,
       });
       if (res.success) {
-        setSku(''); setName(''); setPrice(''); setSupplierId('');
+        setSku(''); setName(''); setMoTa(''); setPrice(''); setSupplierId('');
         toast.success('Đã thêm linh kiện mới vào kho.');
         await loadProducts();
       } else {
@@ -107,6 +109,7 @@ function Products() {
   const startEdit = (item) => {
     setEditingId(item.id);
     setEditName(item.name);
+    setEditMoTa(item.mo_ta || '');
     setEditPrice(item.price);
     setEditSupplierId(item.supplier_id || '');
   };
@@ -114,7 +117,7 @@ function Products() {
   const handleSaveEdit = async (id) => {
     try {
       const res = await productService.update(id, {
-        name: editName,
+        name: editName, mo_ta: editMoTa,
         price: Number(editPrice),
         supplier_id: editSupplierId || null,
       });
@@ -159,6 +162,10 @@ function Products() {
             <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 5 }}>Tên linh kiện</label>
             <input type="text" placeholder="Tên chi tiết linh kiện" value={name} onChange={(e) => setName(e.target.value)} required style={{ padding: '9px', width: '100%', boxSizing: 'border-box', border: '1px solid #dcdfe3', borderRadius: 6 }} />
           </div>
+          <div style={{ flex: 2, minWidth: 200 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 5 }}>Mô tả</label>
+            <input type="text" placeholder="VD: Bàn phím cơ, switch đỏ, kết nối USB-C..." value={moTa} onChange={(e) => setMoTa(e.target.value)} style={{ padding: '9px', width: '100%', boxSizing: 'border-box', border: '1px solid #dcdfe3', borderRadius: 6 }} />
+          </div>
           <div style={{ flex: 1, minWidth: 160 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: '#5a6c7a', marginBottom: 5 }}>Nhà cung cấp</label>
             <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} style={{ padding: '9px', width: '100%', boxSizing: 'border-box', border: '1px solid #dcdfe3', borderRadius: 6 }}>
@@ -197,6 +204,7 @@ function Products() {
               <tr style={{ backgroundColor: '#2c3e50', color: 'white' }}>
                 <th style={{ padding: '12px' }}>Mã SKU</th>
                 <th style={{ padding: '12px' }}>Tên Linh Kiện</th>
+                <th style={{ padding: '12px' }}>Mô Tả</th>
                 <th style={{ padding: '12px' }}>Nhà Cung Cấp</th>
                 <th style={{ padding: '12px' }}>Đơn Giá</th>
                 <th style={{ padding: '12px' }}>Số Tồn</th>
@@ -205,7 +213,7 @@ function Products() {
             </thead>
             <tbody>
               {products.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>Không tìm thấy linh kiện phù hợp.</td></tr>
+                <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>Không tìm thấy linh kiện phù hợp.</td></tr>
               ) : products.map(item => {
                 const isEditing = editingId === item.id;
                 return (
@@ -213,6 +221,9 @@ function Products() {
                     <td style={{ padding: '12px', fontWeight: 'bold' }}>{item.sku}</td>
                     <td style={{ padding: '12px' }}>
                       {isEditing ? <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ padding: '6px', width: '90%', border: '1px solid #dcdfe3', borderRadius: 4 }} /> : item.name}
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      {isEditing ? <input type="text" value={editMoTa} onChange={(e) => setEditMoTa(e.target.value)} style={{ padding: '6px', width: '90%', border: '1px solid #dcdfe3', borderRadius: 4 }} /> : (item.mo_ta || '—')}
                     </td>
                     <td style={{ padding: '12px' }}>
                       {isEditing ? (

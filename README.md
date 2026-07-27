@@ -146,5 +146,5 @@ npm run dev
 - [ ] Trang **Quản lý kho**: bảng kho hàng / hàng hóa / nhà cung cấp / số lượng tồn, form ngưỡng cảnh báo.
 - [ ] Bước **chọn kho** (thủ công/tự động) trong form lập phiếu nhập/xuất.
 - [ ] Bộ lọc **Nhật ký giao dịch** (mã phiếu, loại hình, khoảng ngày).
-- [ ] Đổi nhãn "Phân loại" → "Mô tả hàng hóa" ở trang Danh mục.
+- [x] Đổi nhãn "Phân loại" → "Mô tả hàng hóa" ở trang Danh mục.
 - [ ] Biểu đồ biến động xuất/nhập theo thời gian ở Dashboard (hiện mới có biểu đồ theo danh mục & tỉ lệ tồn).
