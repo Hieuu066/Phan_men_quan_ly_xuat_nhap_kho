@@ -82,10 +82,12 @@ function Dashboard() {
     };
   }, [products]);
 
-  // ── Dữ liệu biểu đồ 2: Tỉ lệ tình trạng tồn kho (tổng hợp mọi kho) ──
-  // ItemController::index() tra ve "tong_ton_kho" (tong qua tat ca kho), khong phai
-  // "quantity_on_hand"/"min_stock" (2 truong nay khong ton tai o API san pham).
-  const stockStatusChartData = useMemo(() => {
+  // ── Đếm trạng thái tồn kho theo TỪNG SẢN PHẨM — dùng CHUNG 1 nguồn cho cả
+  // 2 thẻ KPI + biểu đồ tròn + bảng chi tiết, để không lệch số như trước.
+  // (outOfStockCount kiểu cũ đếm trên lowStockList — danh sách này chỉ chứa sản phẩm
+  // ĐÃ có dòng kho_ton_kho và dòng đó <= ngưỡng, nên bỏ sót sản phẩm chưa từng nhập
+  // kho lần nào dù tong_ton_kho của nó vẫn đúng là 0.)
+  const stockStatusCounts = useMemo(() => {
     let ok = 0, low = 0, out = 0;
     products.forEach((p) => {
       const qty = Number(p.tong_ton_kho) || 0;
@@ -93,23 +95,26 @@ function Dashboard() {
       else if (lowStockProductIds.has(p.id)) low += 1;
       else ok += 1;
     });
-    return {
-      labels: ["Đủ hàng bán", "Cần nhập gấp", "Hết hàng"],
-      datasets: [
-        {
-          data: [ok, low, out],
-          backgroundColor: ["#2ecc71", "#f1c40f", "#e74c3c"],
-          borderWidth: 0,
-        },
-      ],
-    };
+    return { ok, low, out };
   }, [products, lowStockProductIds]);
+
+  // ── Dữ liệu biểu đồ 2: Tỉ lệ tình trạng tồn kho (tổng hợp mọi kho) ──
+  const stockStatusChartData = useMemo(() => ({
+    labels: ["Đủ hàng bán", "Cần nhập gấp", "Hết hàng"],
+    datasets: [
+      {
+        data: [stockStatusCounts.ok, stockStatusCounts.low, stockStatusCounts.out],
+        backgroundColor: ["#2ecc71", "#f1c40f", "#e74c3c"],
+        borderWidth: 0,
+      },
+    ],
+  }), [stockStatusCounts]);
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Đang tải dữ liệu...</div>;
   if (error) return <div style={{ padding: 20, color: "#e74c3c" }}>{error}</div>;
 
-  const outOfStockCount = lowStockList.filter((p) => Number(p.quantity_on_hand) === 0).length;
-  const lowStockCount = lowStockList.length - outOfStockCount;
+  const outOfStockCount = stockStatusCounts.out;
+  const lowStockCount = stockStatusCounts.low;
 
   return (
     <div>
