@@ -89,6 +89,12 @@ class ExportOrderController {
             Response::err("Vui lòng cung cấp đủ thông tin người nhận và danh sách sản phẩm", 400);
         }
 
+        // warehouse_mode: 'manual' (mặc định, giữ nguyên hành vi cũ — mỗi dòng phải có kho_id)
+        // hoặc 'auto' (hệ thống tự chọn kho còn nhiều hàng nhất, tự chia sang nhiều kho nếu 1 kho không đủ)
+        $warehouseMode = in_array($body['warehouse_mode'] ?? 'manual', ['manual', 'auto'], true)
+            ? $body['warehouse_mode'] ?? 'manual'
+            : 'manual';
+
         try {
             $db->beginTransaction();
 
@@ -111,7 +117,7 @@ class ExportOrderController {
             // Update trừ tồn kho
             $stmtUpdateStock = $db->prepare("UPDATE kho_ton_kho SET so_luong_ton = so_luong_ton - ? WHERE kho_id = ? AND product_id = ?");
             
-            // Tìm kho gợi ý thay thế
+            // Tìm kho gợi ý thay thế (dùng cho warehouse_mode=manual khi kho đã chọn không đủ hàng)
             $stmtFindAlternatives = $db->prepare("
                 SELECT k.id AS kho_id, k.ten_kho, ktk.so_luong_ton AS available_stock
                 FROM kho_hang k
@@ -120,16 +126,67 @@ class ExportOrderController {
                 ORDER BY available_stock DESC
                 LIMIT 3
             ");
+
+            // Dùng cho warehouse_mode=auto: khoá + lấy TẤT CẢ kho đang hoạt động có tồn sản phẩm
+            // này, kho nhiều hàng nhất xếp trước — để phân bổ dần tới khi đủ số lượng yêu cầu.
+            $stmtStockAllOrdered = $db->prepare("
+                SELECT ktk.kho_id, k.ten_kho, ktk.so_luong_ton
+                FROM kho_ton_kho ktk
+                JOIN kho_hang k ON ktk.kho_id = k.id
+                WHERE ktk.product_id = ? AND k.trang_thai = 'active'
+                ORDER BY ktk.so_luong_ton DESC
+                FOR UPDATE
+            ");
             // Xử lý từng dòng chi tiết
             foreach ($body['details'] as $item) {
-                if (empty($item['product_id']) || empty($item['quantity']) || !isset($item['unit_price']) || empty($item['kho_id'])) {
-                    throw new Exception("Thông tin chi tiết sản phẩm bị thiếu hoặc chưa chọn kho (cần có kho_id)", 400);
+                if (empty($item['product_id']) || empty($item['quantity']) || !isset($item['unit_price'])) {
+                    throw new Exception("Thông tin chi tiết sản phẩm bị thiếu (cần product_id, quantity, unit_price)", 400);
                 }
 
-                $qty = (int)$item['quantity'];
-                $khoId = (int)$item['kho_id'];
                 $productId = (int)$item['product_id'];
                 $unitPrice = (int)$item['unit_price'];
+                $qtyNeeded = (int)$item['quantity'];
+
+                if ($warehouseMode === 'auto') {
+                    // ===== CHẾ ĐỘ TỰ ĐỘNG: hệ thống tự chọn kho, tự chia sang nhiều kho nếu cần =====
+                    $stmtStockAllOrdered->execute([$productId]);
+                    $stockRows = $stmtStockAllOrdered->fetchAll(PDO::FETCH_ASSOC);
+                    $totalAvailable = array_sum(array_column($stockRows, 'so_luong_ton'));
+
+                    // Chỉ khi TỔNG tồn kho toàn hệ thống vẫn không đủ mới báo lỗi (đúng yêu cầu)
+                    if ($totalAvailable < $qtyNeeded) {
+                        $db->rollBack();
+                        http_response_code(409);
+                        echo json_encode([
+                            "success" => false,
+                            "message" => "Sản phẩm ID {$productId}: toàn hệ thống chỉ còn {$totalAvailable}, không đủ để xuất {$qtyNeeded} (thiếu " . ($qtyNeeded - $totalAvailable) . ").",
+                        ]);
+                        exit;
+                    }
+
+                    // Phân bổ dần từ kho nhiều hàng nhất cho tới khi đủ số lượng yêu cầu
+                    // (1 dòng yêu cầu có thể tách thành nhiều dòng chi_tiet_phieu_xuat nếu phải lấy từ >1 kho)
+                    $remaining = $qtyNeeded;
+                    foreach ($stockRows as $row) {
+                        if ($remaining <= 0) break;
+                        if ((int)$row['so_luong_ton'] <= 0) continue;
+
+                        $take = min($remaining, (int)$row['so_luong_ton']);
+                        $stmtUpdateStock->execute([$take, $row['kho_id'], $productId]);
+                        $stmtDetail->execute([$orderId, $productId, $row['kho_id'], $take, $unitPrice]);
+                        $remaining -= $take;
+                    }
+                    $totalAmount += ($qtyNeeded * $unitPrice);
+                    continue;
+                }
+
+                // ===== CHẾ ĐỘ THỦ CÔNG (mặc định, giữ nguyên hành vi cũ) =====
+                if (empty($item['kho_id'])) {
+                    throw new Exception("Thông tin chi tiết sản phẩm bị thiếu hoặc chưa chọn kho (cần có kho_id, hoặc gửi warehouse_mode=\"auto\" để hệ thống tự chọn)", 400);
+                }
+
+                $qty = $qtyNeeded;
+                $khoId = (int)$item['kho_id'];
 
                 // 4. Kiểm tra tồn kho Real-time (Tránh Race Condition)
                 $stmtCheckStock->execute([$khoId, $productId]);
@@ -149,7 +206,7 @@ class ExportOrderController {
                         "message" => "Sản phẩm ID {$productId} không đủ tồn tại kho ID {$khoId} (Tồn: {$currentStock}, Cần: {$qty}).",
                         "suggestions" => [
                             "alternative_warehouses" => $alternatives,
-                            "split_option" => "Bạn có thể xuất {$currentStock} từ kho này và tạo thêm phiếu lấy từ các kho khác."
+                            "split_option" => "Bạn có thể xuất {$currentStock} từ kho này và tạo thêm phiếu lấy từ các kho khác, hoặc gửi lại với warehouse_mode=\"auto\" để hệ thống tự chia."
                         ]
                     ]);
                     exit;
