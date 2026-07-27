@@ -14,13 +14,13 @@ class TransactionController {
         // Tạo một bảng ảo (Subquery) bằng UNION ALL chứa tất cả giao dịch
         $baseSql = "
             SELECT * FROM (
-                SELECT id, code, 'import' AS type, total_amount, created_at,
+                SELECT id, code, 'import' AS type, total_amount, created_at, note,
                        (SELECT name FROM nha_cung_cap WHERE id = phieu_nhap.supplier_id) AS counterparty
                 FROM phieu_nhap
                 
                 UNION ALL
                 
-                SELECT id, code, 'export' AS type, total_amount, created_at,
+                SELECT id, code, 'export' AS type, total_amount, created_at, note,
                        nguoi_nhan AS counterparty
                 FROM phieu_xuat
             ) AS transactions

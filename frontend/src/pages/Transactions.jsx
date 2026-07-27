@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { productService } from '../services/product.service';
 import { supplierService } from '../services/supplier.service';
 import { orderService } from '../services/order.service';
+import { transactionService } from '../services/transaction.service';
 import { warehouseService } from '../services/warehouse.service';
 import { warehouseStockService } from '../services/warehouseStock.service';
 import { formatCurrency, formatDate } from '../utils/format';
 import { useToast } from '../hooks/useToast';
+import { useDebounce } from '../hooks/useDebounce';
 import { ToastContainer } from '../components/Feedback';
 
 // Bước 1-2 dùng chung 1 màu (xanh dương) khi đang "có thể thao tác" —
@@ -23,8 +25,18 @@ function Transactions() {
   const [suppliers, setSuppliers] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [history, setHistory] = useState([]);
+  const [historyMeta, setHistoryMeta] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Bộ lọc Nhật ký giao dịch — gọi thẳng /api/transactions, backend đã hỗ trợ sẵn
+  const [filterKeyword, setFilterKeyword] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterFromDate, setFilterFromDate] = useState('');
+  const [filterToDate, setFilterToDate] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const debouncedKeyword = useDebounce(filterKeyword, 400);
 
   const [type, setType] = useState('import');
   const [supplierId, setSupplierId] = useState('');
@@ -44,24 +56,43 @@ function Transactions() {
   const [lineUnitPrice, setLineUnitPrice] = useState('');
 
   const loadAll = useCallback(async () => {
-    const [prodRes, supRes, whRes, impRes, expRes] = await Promise.all([
+    const [prodRes, supRes, whRes] = await Promise.all([
       productService.getAll({ per_page: 100 }),
       supplierService.getAll({ per_page: 100 }),
       warehouseService.getAll({ per_page: 100 }),
-      orderService.getImportOrders({ per_page: 20 }),
-      orderService.getExportOrders({ per_page: 20 }),
     ]);
     if (prodRes.success) setProducts(prodRes.data);
     if (supRes.success) setSuppliers(supRes.data);
     if (whRes.success) setWarehouses(whRes.data);
-
-    const imports = (impRes.success ? impRes.data : []).map((o) => ({ ...o, _type: 'Nhập kho' }));
-    const exports = (expRes.success ? expRes.data : []).map((o) => ({ ...o, _type: 'Xuất kho' }));
-    const merged = [...imports, ...exports].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    setHistory(merged);
   }, []);
 
   useEffect(() => { loadAll().finally(() => setLoading(false)); }, [loadAll]);
+
+  // Nhật ký giao dịch — gọi riêng, có lọc theo mã phiếu/loại hình/khoảng ngày.
+  // Tách khỏi loadAll để đổi bộ lọc không phải tải lại products/suppliers/warehouses.
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await transactionService.getAll({
+        page: historyPage,
+        per_page: 10,
+        keyword: debouncedKeyword || undefined,
+        type: filterType || undefined,
+        from_date: filterFromDate || undefined,
+        to_date: filterToDate || undefined,
+      });
+      if (res.success) { setHistory(res.data); setHistoryMeta(res.meta); }
+    } catch {
+      toast.error('Không tải được nhật ký giao dịch.');
+    } finally {
+      setHistoryLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyPage, debouncedKeyword, filterType, filterFromDate, filterToDate]);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+  // Đổi bộ lọc (trừ trang) thì quay về trang 1
+  useEffect(() => { setHistoryPage(1); }, [debouncedKeyword, filterType, filterFromDate, filterToDate]);
 
   // Mỗi khi đổi kho, tải lại tồn kho THEO ĐÚNG kho đó để hiển thị số chính xác
   // trong ô chọn sản phẩm và để chặn xuất vượt tồn ngay trên giao diện.
@@ -139,7 +170,7 @@ function Transactions() {
       }
       toast.success(`Tạo phiếu ${type === 'import' ? 'nhập' : 'xuất'} thành công với ${cart.length} mặt hàng!`);
       setSupplierId(''); setNguoiNhan(''); setNote(''); setCart([]);
-      await loadAll();
+      await Promise.all([loadAll(), loadHistory()]);
     } catch (err) {
       const data = err.response?.data;
       const alternatives = data?.suggestions?.alternative_warehouses;
@@ -289,6 +320,40 @@ function Transactions() {
 
       <div className="app-table-wrap" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
         <h3 style={{ marginTop: 0 }}>📜 Nhật Ký Giao Dịch Kho Công Nghệ</h3>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <input
+            type="text" placeholder="🔍 Tìm theo mã phiếu, đối tác..."
+            value={filterKeyword} onChange={(e) => setFilterKeyword(e.target.value)}
+            style={{ flex: '2 1 220px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }}
+          />
+          <select
+            value={filterType} onChange={(e) => setFilterType(e.target.value)}
+            style={{ flex: '1 1 150px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }}
+          >
+            <option value="">Tất cả loại hình</option>
+            <option value="import">Nhập kho</option>
+            <option value="export">Xuất kho</option>
+          </select>
+          <input
+            type="date" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)}
+            title="Từ ngày" style={{ flex: '1 1 150px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }}
+          />
+          <input
+            type="date" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)}
+            title="Đến ngày" style={{ flex: '1 1 150px', padding: '10px', borderRadius: 6, border: '1px solid #dcdfe3' }}
+          />
+          {(filterKeyword || filterType || filterFromDate || filterToDate) && (
+            <button
+              type="button"
+              onClick={() => { setFilterKeyword(''); setFilterType(''); setFilterFromDate(''); setFilterToDate(''); }}
+              className="btn btn-outline btn-sm"
+            >
+              ✕ Xóa lọc
+            </button>
+          )}
+        </div>
+
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
@@ -301,24 +366,40 @@ function Transactions() {
             </tr>
           </thead>
           <tbody>
-            {history.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>Chưa có giao dịch nào.</td></tr>
+            {historyLoading ? (
+              <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>Đang tải...</td></tr>
+            ) : history.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>Không có giao dịch phù hợp.</td></tr>
             ) : history.map(tx => (
-              <tr key={`${tx._type}-${tx.id}`} style={{ borderBottom: '1px solid #dee2e6' }}>
+              <tr key={`${tx.type}-${tx.id}`} style={{ borderBottom: '1px solid #dee2e6' }}>
                 <td style={{ padding: '12px', fontWeight: 'bold' }}>{tx.code || `#${tx.id}`}</td>
                 <td style={{ padding: '12px' }}>
-                  <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', color: 'white', backgroundColor: tx._type === 'Nhập kho' ? '#2ecc71' : '#e67e22' }}>
-                    {tx._type === 'Nhập kho' ? 'Nhập Mua' : 'Xuất Bán'}
+                  <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', color: 'white', backgroundColor: tx.type === 'import' ? '#2ecc71' : '#e67e22' }}>
+                    {tx.type === 'import' ? 'Nhập Mua' : 'Xuất Bán'}
                   </span>
                 </td>
-                <td style={{ padding: '12px' }}>{tx._type === 'Nhập kho' ? (tx.supplier_name || `NCC #${tx.supplier_id}`) : tx.nguoi_nhan}</td>
+                <td style={{ padding: '12px' }}>{tx.counterparty || '—'}</td>
                 <td style={{ padding: '12px', fontWeight: 'bold' }}>{formatCurrency(tx.total_amount)}</td>
                 <td style={{ padding: '12px' }}>{formatDate(tx.created_at)}</td>
-                <td style={{ padding: '12px', color: '#666', fontSize: '14px' }}>{tx.note}</td>
+                <td style={{ padding: '12px', color: '#666', fontSize: '14px' }}>{tx.note || ''}</td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        {historyMeta && historyMeta.total_pages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 13, color: '#8a94a0' }}>
+              Trang {historyMeta.current_page}/{historyMeta.total_pages} — {historyMeta.total} giao dịch
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" className="btn btn-outline btn-sm" disabled={!historyMeta.has_prev}
+                onClick={() => setHistoryPage(p => p - 1)}>‹ Trước</button>
+              <button type="button" className="btn btn-outline btn-sm" disabled={!historyMeta.has_next}
+                onClick={() => setHistoryPage(p => p + 1)}>Sau ›</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
