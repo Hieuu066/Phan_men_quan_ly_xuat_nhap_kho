@@ -53,12 +53,20 @@ function Dashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Dữ liệu biểu đồ 1: Số lượng mặt hàng theo từng nhóm sản phẩm ──
-  const categoryChartData = useMemo(() => {
+  // San pham nao dang duoi nguong canh bao o it nhat 1 kho (ReportController::lowStock()
+  // tra ve theo tung cap kho-san pham, nen 1 product_id co the lap lai nhieu lan)
+  const lowStockProductIds = useMemo(
+    () => new Set(lowStockList.map((x) => x.product_id)),
+    [lowStockList]
+  );
+
+  // ── Dữ liệu biểu đồ 1: Số lượng SKU theo nhà cung cấp ──
+  // (San pham khong co cot "category" trong schema nen doi sang nhom theo NCC - du lieu that)
+  const supplierChartData = useMemo(() => {
     const counts = {};
     products.forEach((p) => {
-      const cat = p.category || "Chưa phân loại";
-      counts[cat] = (counts[cat] || 0) + 1;
+      const sup = p.supplier_name || "Chưa gán NCC";
+      counts[sup] = (counts[sup] || 0) + 1;
     });
     const labels = Object.keys(counts);
     return {
@@ -74,14 +82,15 @@ function Dashboard() {
     };
   }, [products]);
 
-  // ── Dữ liệu biểu đồ 2: Tỉ lệ tình trạng tồn kho ──
+  // ── Dữ liệu biểu đồ 2: Tỉ lệ tình trạng tồn kho (tổng hợp mọi kho) ──
+  // ItemController::index() tra ve "tong_ton_kho" (tong qua tat ca kho), khong phai
+  // "quantity_on_hand"/"min_stock" (2 truong nay khong ton tai o API san pham).
   const stockStatusChartData = useMemo(() => {
     let ok = 0, low = 0, out = 0;
     products.forEach((p) => {
-      const qty = Number(p.quantity_on_hand);
-      const min = Number(p.min_stock);
+      const qty = Number(p.tong_ton_kho) || 0;
       if (qty === 0) out += 1;
-      else if (qty < min) low += 1;
+      else if (lowStockProductIds.has(p.id)) low += 1;
       else ok += 1;
     });
     return {
@@ -94,7 +103,7 @@ function Dashboard() {
         },
       ],
     };
-  }, [products]);
+  }, [products, lowStockProductIds]);
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Đang tải dữ liệu...</div>;
   if (error) return <div style={{ padding: 20, color: "#e74c3c" }}>{error}</div>;
@@ -153,11 +162,11 @@ function Dashboard() {
       {/* BIỂU ĐỒ TRỰC QUAN */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px", marginBottom: "30px" }}>
         <div style={{ backgroundColor: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
-          <h3 style={{ marginTop: 0, marginBottom: "15px", color: "#2c3e50", fontSize: "16px" }}>📊 Số lượng SKU theo nhóm sản phẩm</h3>
+          <h3 style={{ marginTop: 0, marginBottom: "15px", color: "#2c3e50", fontSize: "16px" }}>📊 Số lượng SKU theo nhà cung cấp</h3>
           {products.length === 0 ? (
             <p style={{ color: "#7f8c8d", textAlign: "center", padding: "40px 0" }}>Chưa có dữ liệu sản phẩm.</p>
           ) : (
-            <Bar data={categoryChartData} options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { stepSize: 1 } } } }} />
+            <Bar data={supplierChartData} options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { stepSize: 1 } } } }} />
           )}
         </div>
         <div style={{ backgroundColor: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
@@ -178,7 +187,6 @@ function Dashboard() {
             <tr style={{ backgroundColor: "#f8f9fa", borderBottom: "2px solid #dee2e6" }}>
               <th style={{ padding: "12px" }}>Mã hàng (SKU)</th>
               <th style={{ padding: "12px" }}>Tên linh kiện điện tử</th>
-              <th style={{ padding: "12px" }}>Nhóm sản phẩm</th>
               <th style={{ padding: "12px" }}>Nhà cung cấp</th>
               <th style={{ padding: "12px" }}>Số lượng còn lại</th>
               <th style={{ padding: "12px" }}>Trạng thái phân phối</th>
@@ -186,14 +194,13 @@ function Dashboard() {
           </thead>
           <tbody>
             {products.map((item) => {
-              const qty = Number(item.quantity_on_hand);
-              const minStock = Number(item.min_stock);
+              const qty = Number(item.tong_ton_kho) || 0;
               let statusText = "Đủ hàng bán";
               let statusColor = "#2ecc71";
               if (qty === 0) {
                 statusText = "Hết hàng";
                 statusColor = "#e74c3c";
-              } else if (qty < minStock) {
+              } else if (lowStockProductIds.has(item.id)) {
                 statusText = "Cần nhập gấp";
                 statusColor = "#f1c40f";
               }
@@ -202,7 +209,6 @@ function Dashboard() {
                 <tr key={item.id} style={{ borderBottom: "1px solid #dee2e6" }}>
                   <td style={{ padding: "12px", fontWeight: "bold", color: "#34495e" }}>{item.sku}</td>
                   <td style={{ padding: "12px" }}>{item.name}</td>
-                  <td style={{ padding: "12px", color: "#7f8c8d" }}>{item.category}</td>
                   <td style={{ padding: "12px" }}>🏭 {item.supplier_name || "Chưa gán NCC"}</td>
                   <td style={{ padding: "12px", fontWeight: "bold" }}>{formatNumber(qty)} {item.unit}</td>
                   <td style={{ padding: "12px" }}>
