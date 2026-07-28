@@ -55,6 +55,7 @@ function Products() {
 
   useEffect(() => {
     setRefreshing(true);
+    setError('');
     Promise.all([
       productService.getAll({ page, per_page: 10, search: debouncedSearch }),
       supplierService.getAll({ per_page: 100 }),
