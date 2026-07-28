@@ -14,9 +14,12 @@ class WarehouseStockController {
         $limit = max(1, min(100, (int)($_GET["per_page"] ?? self::PER_PAGE)));
         // Xây dựng câu truy vấn cơ sở — dùng VIEW v_ton_kho_chi_tiet (đã gộp sẵn
         // JOIN kho_hang + san_pham + nha_cung_cap) thay vì lặp lại JOIN thủ công.
-        $sql = "SELECT kho_ton_kho_id AS id, kho_id, ten_kho, product_id, product_name, sku,
-                       supplier_id, supplier_name, so_luong_ton, nguong_canh_bao
-                FROM v_ton_kho_chi_tiet
+        $sql = "SELECT ktk.id, ktk.kho_id, k.ten_kho, ktk.product_id, sp.name AS product_name, sp.sku, 
+                       ncc.name AS supplier_name, ktk.so_luong_ton, ktk.nguong_canh_bao 
+                FROM kho_ton_kho ktk
+                JOIN kho_hang k ON ktk.kho_id = k.id
+                JOIN san_pham sp ON ktk.product_id = sp.id
+                LEFT JOIN nha_cung_cap ncc ON sp.supplier_id = ncc.id
                 WHERE 1=1";
         
         $params = [];

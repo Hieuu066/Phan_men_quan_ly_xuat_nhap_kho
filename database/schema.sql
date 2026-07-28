@@ -1,6 +1,6 @@
 -- 1. Tạo bảng users
-CREATE DATABASE IF NOT EXISTS quanly_xuat_nhap_kho;
-USE quanly_xuat_nhap_kho;
+-- CREATE DATABASE IF NOT EXISTS quanly_xuat_nhap_kho;
+-- USE quanly_xuat_nhap_kho;
 
 -- Đảm bảo phiên làm việc dùng đúng utf8mb4/utf8mb4_unicode_ci khi tạo bảng/VIEW/PROCEDURE,
 -- tránh lỗi "Illegal mix of collations" nếu client import (mysql CLI/phpMyAdmin) không mặc
@@ -227,28 +227,28 @@ CREATE TABLE chi_tiet_phieu_xuat (
 -- (WarehouseStockController, AlertController) thay vì lặp lại cùng 1 bộ
 -- JOIN ở nhiều nơi trong code.
 -- ================================================================
-CREATE OR REPLACE VIEW v_ton_kho_chi_tiet AS
-SELECT
-    ktk.id AS kho_ton_kho_id,
-    k.id AS kho_id,
-    k.ten_kho,
-    k.trang_thai AS kho_trang_thai,
-    sp.id AS product_id,
-    sp.sku,
-    sp.name AS product_name,
-    sp.unit,
-    sp.price,
-    COALESCE(ktk.supplier_id, sp.supplier_id) AS supplier_id,
-    ncc.id AS resolved_supplier_id,
-    ncc.name AS supplier_name,
-    ktk.so_luong_ton,
-    ktk.nguong_canh_bao,
-    (ktk.so_luong_ton <= ktk.nguong_canh_bao) AS is_low_stock,
-    (ktk.so_luong_ton * sp.price) AS gia_tri_ton_kho
-FROM kho_ton_kho ktk
-JOIN kho_hang k ON ktk.kho_id = k.id
-JOIN san_pham sp ON ktk.product_id = sp.id
-LEFT JOIN nha_cung_cap ncc ON ncc.id = COALESCE(ktk.supplier_id, sp.supplier_id);
+-- CREATE OR REPLACE VIEW v_ton_kho_chi_tiet AS
+-- SELECT
+--     ktk.id AS kho_ton_kho_id,
+--     k.id AS kho_id,
+--     k.ten_kho,
+--     k.trang_thai AS kho_trang_thai,
+--     sp.id AS product_id,
+--     sp.sku,
+--     sp.name AS product_name,
+--     sp.unit,
+--     sp.price,
+--     COALESCE(ktk.supplier_id, sp.supplier_id) AS supplier_id,
+--     ncc.id AS resolved_supplier_id,
+--     ncc.name AS supplier_name,
+--     ktk.so_luong_ton,
+--     ktk.nguong_canh_bao,
+--     (ktk.so_luong_ton <= ktk.nguong_canh_bao) AS is_low_stock,
+--     (ktk.so_luong_ton * sp.price) AS gia_tri_ton_kho
+-- FROM kho_ton_kho ktk
+-- JOIN kho_hang k ON ktk.kho_id = k.id
+-- JOIN san_pham sp ON ktk.product_id = sp.id
+-- LEFT JOIN nha_cung_cap ncc ON ncc.id = COALESCE(ktk.supplier_id, sp.supplier_id);
 
 -- ================================================================
 -- STORED PROCEDURE: sp_bao_cao_xuat_nhap_ton
@@ -257,45 +257,45 @@ LEFT JOIN nha_cung_cap ncc ON ncc.id = COALESCE(ktk.supplier_id, sp.supplier_id)
 -- cáo này cần tham số động (from_date/to_date/kho_id) — View không hỗ
 -- trợ tham số hoá theo cách này.
 -- ================================================================
-DELIMITER $$
-CREATE PROCEDURE sp_bao_cao_xuat_nhap_ton(
-    IN p_from_date DATETIME,
-    IN p_to_date DATETIME,
-    IN p_kho_id INT,
-    IN p_mo_ta VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-)
-BEGIN
-    SELECT
-        sp.id AS product_id,
-        sp.sku,
-        sp.name,
-        sp.mo_ta,
-        sp.unit,
-        p_kho_id AS kho_id,
-        (SELECT ten_kho FROM kho_hang WHERE id = p_kho_id) AS ten_kho,
-        COALESCE(SUM(k.so_luong_ton), 0) AS closing_stock,
-        COALESCE((
-            SELECT SUM(ctpn.quantity)
-            FROM chi_tiet_phieu_nhap ctpn
-            JOIN phieu_nhap pn ON ctpn.phieu_nhap_id = pn.id
-            WHERE ctpn.product_id = sp.id
-              AND pn.created_at BETWEEN p_from_date AND p_to_date
-              AND (p_kho_id IS NULL OR ctpn.kho_id = p_kho_id)
-        ), 0) AS total_import,
-        COALESCE((
-            SELECT SUM(ctpx.quantity)
-            FROM chi_tiet_phieu_xuat ctpx
-            JOIN phieu_xuat px ON ctpx.phieu_xuat_id = px.id
-            WHERE ctpx.product_id = sp.id
-              AND px.created_at BETWEEN p_from_date AND p_to_date
-              AND (p_kho_id IS NULL OR ctpx.kho_id = p_kho_id)
-        ), 0) AS total_export
-    FROM san_pham sp
-    LEFT JOIN kho_ton_kho k
-        ON k.product_id = sp.id AND (p_kho_id IS NULL OR k.kho_id = p_kho_id)
-    WHERE sp.status = 'active'
-      AND (p_mo_ta IS NULL OR p_mo_ta = '' OR sp.mo_ta LIKE CONCAT('%', p_mo_ta, '%'))
-    GROUP BY sp.id
-    ORDER BY sp.id DESC;
-END$$
-DELIMITER ;
+-- DELIMITER $$
+-- CREATE PROCEDURE sp_bao_cao_xuat_nhap_ton(
+--     IN p_from_date DATETIME,
+--     IN p_to_date DATETIME,
+--     IN p_kho_id INT,
+--     IN p_mo_ta VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+-- )
+-- BEGIN
+--     SELECT
+--         sp.id AS product_id,
+--         sp.sku,
+--         sp.name,
+--         sp.mo_ta,
+--         sp.unit,
+--         p_kho_id AS kho_id,
+--         (SELECT ten_kho FROM kho_hang WHERE id = p_kho_id) AS ten_kho,
+--         COALESCE(SUM(k.so_luong_ton), 0) AS closing_stock,
+--         COALESCE((
+--             SELECT SUM(ctpn.quantity)
+--             FROM chi_tiet_phieu_nhap ctpn
+--             JOIN phieu_nhap pn ON ctpn.phieu_nhap_id = pn.id
+--             WHERE ctpn.product_id = sp.id
+--               AND pn.created_at BETWEEN p_from_date AND p_to_date
+--               AND (p_kho_id IS NULL OR ctpn.kho_id = p_kho_id)
+--         ), 0) AS total_import,
+--         COALESCE((
+--             SELECT SUM(ctpx.quantity)
+--             FROM chi_tiet_phieu_xuat ctpx
+--             JOIN phieu_xuat px ON ctpx.phieu_xuat_id = px.id
+--             WHERE ctpx.product_id = sp.id
+--               AND px.created_at BETWEEN p_from_date AND p_to_date
+--               AND (p_kho_id IS NULL OR ctpx.kho_id = p_kho_id)
+--         ), 0) AS total_export
+--     FROM san_pham sp
+--     LEFT JOIN kho_ton_kho k
+--         ON k.product_id = sp.id AND (p_kho_id IS NULL OR k.kho_id = p_kho_id)
+--     WHERE sp.status = 'active'
+--       AND (p_mo_ta IS NULL OR p_mo_ta = '' OR sp.mo_ta LIKE CONCAT('%', p_mo_ta, '%'))
+--     GROUP BY sp.id
+--     ORDER BY sp.id DESC;
+-- END$$
+-- DELIMITER ;
