@@ -21,7 +21,8 @@ function Products() {
   const [products, setProducts] = useState([]);
   const [meta, setMeta] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const [search, setSearch] = useState('');
@@ -53,7 +54,7 @@ function Products() {
   useEffect(() => { setPage(1); }, [debouncedSearch]);
 
   useEffect(() => {
-    setLoading(true);
+    setRefreshing(true);
     Promise.all([
       productService.getAll({ page, per_page: 10, search: debouncedSearch }),
       supplierService.getAll({ per_page: 100 }),
@@ -63,7 +64,7 @@ function Products() {
         if (supRes.success) setSuppliers(supRes.data);
       })
       .catch((err) => setError(err.response?.data?.message || 'Không thể tải dữ liệu.'))
-      .finally(() => setLoading(false));
+      .finally(() => { setRefreshing(false); setInitialLoading(false); });
   }, [page, debouncedSearch]);
 
   const handleAdd = async (e) => {
@@ -138,7 +139,7 @@ function Products() {
     window.open(`${base}/api/items/export`, '_blank');
   };
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Đang tải dữ liệu...</div>;
+  if (initialLoading) return <div style={{ padding: 40, textAlign: 'center' }}>Đang tải dữ liệu...</div>;
 
   return (
     <div>
@@ -211,9 +212,9 @@ function Products() {
                 <th style={{ padding: '12px' }}>Hành Động</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody style={{ opacity: refreshing ? 0.5 : 1, transition: 'opacity 0.15s' }}>
               {products.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>Không tìm thấy linh kiện phù hợp.</td></tr>
+                <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: '#7f8c8d' }}>{refreshing ? 'Đang tìm...' : 'Không tìm thấy linh kiện phù hợp.'}</td></tr>
               ) : products.map(item => {
                 const isEditing = editingId === item.id;
                 return (
