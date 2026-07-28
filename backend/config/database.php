@@ -22,7 +22,7 @@
 */
 function getDB(): PDO {
     $host    = 'localhost';
-    $port    = 3307; // Mặc định chuẩn MySQL/XAMPP — đổi riêng qua database.local.php nếu máy bạn khác
+    $port    = 3306; // Mặc định chuẩn MySQL/XAMPP — đổi riêng qua database.local.php nếu máy bạn khác
     $db      = 'quanly_xuat_nhap_kho';
     $user    = 'root';
     $pass    = '';
