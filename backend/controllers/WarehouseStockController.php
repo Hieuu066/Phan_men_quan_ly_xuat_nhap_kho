@@ -12,21 +12,25 @@ class WarehouseStockController {
         // Lấy tham số phân trang từ URL
         $page = max(1, (int)($_GET["page"] ?? 1));
         $limit = max(1, min(100, (int)($_GET["per_page"] ?? self::PER_PAGE)));
-        // Xây dựng câu truy vấn cơ sở — dùng VIEW v_ton_kho_chi_tiet (đã gộp sẵn
-        // JOIN kho_hang + san_pham + nha_cung_cap) thay vì lặp lại JOIN thủ công.
+        // Xây dựng câu truy vấn cơ sở bằng JOIN thuần (không dùng VIEW — VIEW đã bị
+        // comment trong schema.sql vì một số hosting miễn phí như InfinityFree không
+        // cấp quyền CREATE VIEW/PROCEDURE).
+        // supplier_id ưu tiên nhà cung cấp riêng của lô hàng tại kho này (ktk.supplier_id),
+        // nếu chưa có thì lấy nhà cung cấp mặc định của sản phẩm (sp.supplier_id).
         $sql = "SELECT ktk.id, ktk.kho_id, k.ten_kho, ktk.product_id, sp.name AS product_name, sp.sku, 
-                       ncc.name AS supplier_name, ktk.so_luong_ton, ktk.nguong_canh_bao 
+                       COALESCE(ktk.supplier_id, sp.supplier_id) AS supplier_id, ncc.name AS supplier_name,
+                       ktk.so_luong_ton, ktk.nguong_canh_bao 
                 FROM kho_ton_kho ktk
                 JOIN kho_hang k ON ktk.kho_id = k.id
                 JOIN san_pham sp ON ktk.product_id = sp.id
-                LEFT JOIN nha_cung_cap ncc ON sp.supplier_id = ncc.id
+                LEFT JOIN nha_cung_cap ncc ON ncc.id = COALESCE(ktk.supplier_id, sp.supplier_id)
                 WHERE 1=1";
         
         $params = [];
 
         // Hỗ trợ tìm kiếm theo từ khóa (Tên sản phẩm hoặc SKU)
         if (!empty($_GET['keyword'])) {
-            $sql .= " AND (product_name LIKE ? OR sku LIKE ?)";
+            $sql .= " AND (sp.name LIKE ? OR sp.sku LIKE ?)";
             $keyword = "%" . trim($_GET['keyword']) . "%";
             $params[] = $keyword;
             $params[] = $keyword;
@@ -34,24 +38,25 @@ class WarehouseStockController {
 
         // Hỗ trợ lọc chi tiết theo ID kho cụ thể
         if (!empty($_GET['kho_id'])) {
-            $sql .= " AND kho_id = ?";
+            $sql .= " AND ktk.kho_id = ?";
             $params[] = (int)$_GET['kho_id'];
         }
 
         // Lọc theo 1 sản phẩm cụ thể (VD: xem sản phẩm X đang tồn ở những kho nào)
         if (!empty($_GET['product_id'])) {
-            $sql .= " AND product_id = ?";
+            $sql .= " AND ktk.product_id = ?";
             $params[] = (int)$_GET['product_id'];
         }
 
-        // Lọc theo nhà cung cấp (đã COALESCE sẵn trong VIEW: ưu tiên NCC riêng của lô hàng,
-        // nếu chưa có thì lấy NCC mặc định của sản phẩm)
+        // Lọc theo nhà cung cấp — lặp lại đúng biểu thức COALESCE ở trên vì WHERE không
+        // tham chiếu được alias của SELECT trong cùng 1 câu, và tên cột "supplier_id"
+        // để trần sẽ bị lỗi ambiguous (cả kho_ton_kho lẫn san_pham đều có cột này)
         if (!empty($_GET['supplier_id'])) {
-            $sql .= " AND supplier_id = ?";
+            $sql .= " AND COALESCE(ktk.supplier_id, sp.supplier_id) = ?";
             $params[] = (int)$_GET['supplier_id'];
         }
 
-        $sql .= " ORDER BY id DESC";
+        $sql .= " ORDER BY ktk.id DESC";
         
         // Tích hợp phân trang (Sử dụng class Pagination của hệ thống)
         $result = Pagination::run($sql, $params, $page, $limit);

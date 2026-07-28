@@ -10,25 +10,28 @@ class AlertController {
         Auth::required();
         $db = getDB();
         
-        // Câu truy vấn: Tìm các bản ghi có is_low_stock = 1 từ VIEW v_ton_kho_chi_tiet
-        // (VIEW đã gộp sẵn JOIN kho_hang + san_pham và tính sẵn cột is_low_stock)
-        $sql = "SELECT kho_ton_kho_id AS kho_ton_kho_id, 
-                       kho_id, ten_kho, 
-                       product_id, product_name, sku, 
-                       so_luong_ton, nguong_canh_bao 
-                FROM v_ton_kho_chi_tiet
-                WHERE is_low_stock = 1";
+        // Câu truy vấn: Tìm các bản ghi trong kho_ton_kho có so_luong_ton <= nguong_canh_bao
+        // (viết bằng JOIN thuần, không dùng VIEW — VIEW đã bị comment trong schema.sql vì
+        // một số hosting miễn phí như InfinityFree không cấp quyền CREATE VIEW/PROCEDURE)
+        $sql = "SELECT ktk.id AS kho_ton_kho_id, 
+                       ktk.kho_id, k.ten_kho, 
+                       ktk.product_id, sp.name AS product_name, sp.sku, 
+                       ktk.so_luong_ton, ktk.nguong_canh_bao 
+                FROM kho_ton_kho ktk
+                JOIN kho_hang k ON ktk.kho_id = k.id
+                JOIN san_pham sp ON ktk.product_id = sp.id
+                WHERE ktk.so_luong_ton <= ktk.nguong_canh_bao";
                 
         $params = [];
 
         // Tính năng bổ sung: Hỗ trợ lọc cảnh báo theo kho cụ thể (nếu Front-end cần)
         if (!empty($_GET['kho_id'])) {
-            $sql .= " AND kho_id = ?";
+            $sql .= " AND ktk.kho_id = ?";
             $params[] = (int)$_GET['kho_id'];
         }
 
         // Ưu tiên hiển thị những mặt hàng có tồn kho thấp nhất (nguy cấp nhất) lên trên cùng
-        $sql .= " ORDER BY so_luong_ton ASC";
+        $sql .= " ORDER BY ktk.so_luong_ton ASC";
                 
         $stmt = $db->prepare($sql);
         $stmt->execute($params);

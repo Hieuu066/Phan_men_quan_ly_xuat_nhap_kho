@@ -105,11 +105,13 @@ Phan_men_quan_ly_xuat_nhap_kho/
 ## 4. Hướng dẫn chạy
 
 ### 4.1. Database (MySQL)
-Không cần tạo CSDL tay trước — `schema.sql` tự tạo bằng `CREATE DATABASE IF NOT EXISTS quanly_xuat_nhap_kho`:
+`schema.sql` **không tự tạo CSDL nữa** (để tương thích các hosting không cho phép `CREATE DATABASE` qua SQL, ví dụ InfinityFree) — cần tạo CSDL trống trước, rồi nạp vào đúng CSDL đó:
 ```bash
-mysql -u root -p < database/schema.sql
+mysql -u root -p -e "CREATE DATABASE quanly_xuat_nhap_kho CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p quanly_xuat_nhap_kho < database/schema.sql
 mysql -u root -p quanly_xuat_nhap_kho < database/seed.sql
 ```
+Trên InfinityFree (hoặc hosting tương tự): tạo CSDL qua giao diện quản trị hosting trước (tên CSDL thường có tiền tố riêng do hosting cấp), sau đó vào phpMyAdmin của CSDL đó, dùng mục Import để nạp lần lượt `schema.sql` rồi `seed.sql`. Phần VIEW/STORED PROCEDURE (kỹ thuật nâng cao, không bắt buộc) đang để dạng comment ở cuối `schema.sql` vì nhiều hosting miễn phí không cấp quyền tạo — ứng dụng chạy đầy đủ tính năng mà không cần phần này.
 
 ### 4.2. Back-end
 1. Cấu hình CSDL trong `backend/config/database.php` (mặc định `localhost:3306`). Nếu máy bạn dùng cổng khác, tạo file `backend/config/database.local.php` để override riêng — **không sửa trực tiếp port mặc định trong `database.php`**.

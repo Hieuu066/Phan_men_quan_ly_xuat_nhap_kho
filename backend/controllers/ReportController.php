@@ -90,12 +90,15 @@ class ReportController {
 
             // 1. Xử lý động cột hiển thị: Nếu có kho_id thì lấy thông tin kho, nếu không thì trả NULL
             $selectKho = $khoId 
-                ? ":kho_id AS kho_id, (SELECT ten_kho FROM kho_hang WHERE id = :kho_id) AS ten_kho," 
+                ? ":kho_id_select AS kho_id, (SELECT ten_kho FROM kho_hang WHERE id = :kho_id_ten) AS ten_kho," 
                 : "NULL AS kho_id, NULL AS ten_kho,";
             // 2. Xử lý động điều kiện cho các Subquery và JOIN
-            $khoConditionNhap = $khoId ? " AND ctpn.kho_id = :kho_id" : "";
-            $khoConditionXuat = $khoId ? " AND ctpx.kho_id = :kho_id" : "";
-            $khoConditionTon  = $khoId ? " AND k.kho_id = :kho_id" : "";
+            // Lưu ý: PDO (EMULATE_PREPARES=false) không cho phép dùng lại cùng 1 named
+            // parameter nhiều lần trong 1 câu lệnh (lỗi SQLSTATE[HY093]) — mỗi chỗ dùng
+            // 1 tên riêng, cùng trỏ về $khoId.
+            $khoConditionNhap = $khoId ? " AND ctpn.kho_id = :kho_id_nhap" : "";
+            $khoConditionXuat = $khoId ? " AND ctpx.kho_id = :kho_id_xuat" : "";
+            $khoConditionTon  = $khoId ? " AND k.kho_id = :kho_id_ton" : "";
             // Sử dụng Subquery để đếm nhập/xuất và LEFT JOIN để lấy tổng tồn kho hiện tại
             $sql = "SELECT 
                         sp.id AS product_id,
@@ -112,7 +115,7 @@ class ReportController {
                             FROM chi_tiet_phieu_nhap ctpn 
                             JOIN phieu_nhap pn ON ctpn.phieu_nhap_id = pn.id 
                             WHERE ctpn.product_id = sp.id 
-                            AND pn.created_at BETWEEN :from_date AND :to_date
+                            AND pn.created_at BETWEEN :from_date_nhap AND :to_date_nhap
                             {$khoConditionNhap}
                         ), 0) AS total_import,
                         
@@ -122,7 +125,7 @@ class ReportController {
                             FROM chi_tiet_phieu_xuat ctpx 
                             JOIN phieu_xuat px ON ctpx.phieu_xuat_id = px.id 
                             WHERE ctpx.product_id = sp.id 
-                            AND px.created_at BETWEEN :from_date AND :to_date
+                            AND px.created_at BETWEEN :from_date_xuat AND :to_date_xuat
                             {$khoConditionXuat}
                         ), 0) AS total_export
                         
@@ -132,13 +135,19 @@ class ReportController {
                     WHERE sp.status = 'active'";
 
             $params = [
-                ':from_date' => $fromDate,
-                ':to_date' => $toDate
+                ':from_date_nhap' => $fromDate,
+                ':to_date_nhap' => $toDate,
+                ':from_date_xuat' => $fromDate,
+                ':to_date_xuat' => $toDate,
             ];
 
-            // Thêm tham số cho kho_id nếu có
+            // Thêm tham số cho kho_id nếu có (5 tên riêng, cùng giá trị — xem lý do ở trên)
             if ($khoId) {
-                $params[':kho_id'] = $khoId;
+                $params[':kho_id_select'] = $khoId;
+                $params[':kho_id_ten'] = $khoId;
+                $params[':kho_id_nhap'] = $khoId;
+                $params[':kho_id_xuat'] = $khoId;
+                $params[':kho_id_ton'] = $khoId;
             }
             // Lọc thêm theo mo_ta
             if (!empty($moTa)) {
