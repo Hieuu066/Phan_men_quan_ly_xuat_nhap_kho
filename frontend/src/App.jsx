@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
+import { useDarkMode } from './hooks/useDarkMode';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -10,6 +11,10 @@ import Transactions from './pages/Transactions';
 import Suppliers from './pages/Suppliers';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
+import './styles/reset.css';
+import './styles/global.css';
+import './styles/animations.css';
+import './styles/layout.css';
 import './App.css';
 
 function Layout({ children }) {
@@ -17,6 +22,7 @@ function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [dark, toggleDark] = useDarkMode();
 
   const handleLogout = async () => {
     await logout();
@@ -73,6 +79,9 @@ function Layout({ children }) {
         </div>
         <div style={{ marginTop: '40px', borderTop: '1px solid #4f5d73', paddingTop: '15px', textAlign: 'center' }}>
           {user && <p style={{ fontSize: 12, color: '#8fa3b3', marginBottom: 10 }}>{user.full_name} ({user.role})</p>}
+          <button onClick={toggleDark} className="btn-icon" style={{ color: '#8fa3b3', fontSize: 13, marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            {dark ? '☀️ Chế độ sáng' : '🌙 Chế độ tối'}
+          </button>
           <button onClick={handleLogout} style={{ width: '100%', padding: '8px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>🚪 Đăng xuất</button>
         </div>
       </div>

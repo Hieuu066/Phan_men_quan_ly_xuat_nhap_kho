@@ -1,0 +1,52 @@
+/* ── Keyframe animations — theo HD 02/HD-CFIT.CSE702051, Điều 3 ── */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.93); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(110%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Utility classes ── */
+.animate-fade-up { animation: fadeUp .3s ease both; }
+.animate-fade-in { animation: fadeIn .2s ease both; }
+.animate-scale-in { animation: scaleIn .2s ease both; }
+.animate-slide-in { animation: slideInRight .25s ease both; }
+.animate-slide-down { animation: slideDown .2s ease both; }
+
+.delay-1 { animation-delay: .05s; }
+.delay-2 { animation-delay: .1s; }
+.delay-3 { animation-delay: .15s; }
+.delay-4 { animation-delay: .2s; }
+.delay-5 { animation-delay: .25s; }
+
+.spinner {
+  width: 24px; height: 24px;
+  border: 3px solid var(--clr-gray-200);
+  border-top-color: var(--clr-primary);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+}

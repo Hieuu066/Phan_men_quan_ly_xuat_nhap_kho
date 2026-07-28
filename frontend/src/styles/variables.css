@@ -71,3 +71,17 @@
     --clr-dark: #e9ecef;
   }
 }
+
+/* Dark mode — bật/tắt thủ công qua class "dark" trên <html> (xem hooks/useDarkMode.js) */
+html.dark {
+  --clr-gray-100: #1a1a2e;
+  --clr-gray-200: #16213e;
+  --clr-white: #0f3460;
+  --clr-dark: #e9ecef;
+}
+html.light {
+  --clr-gray-100: #f8f9fa;
+  --clr-gray-200: #e9ecef;
+  --clr-white: #ffffff;
+  --clr-dark: #2c3e50;
+}

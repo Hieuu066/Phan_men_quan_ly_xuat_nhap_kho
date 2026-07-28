@@ -8,7 +8,7 @@ const styles = {
 function ToastItem({ toast, onClose }) {
   const s = styles[toast.type] || styles.success;
   return (
-    <div style={{
+    <div className="animate-slide-in" style={{
       backgroundColor: s.bg, border: `1px solid ${s.border}`, color: s.color,
       padding: '14px 20px', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
       maxWidth: 360, fontSize: 14, display: 'flex', alignItems: 'flex-start', gap: 10,
@@ -52,8 +52,8 @@ export function ConfirmModal({ state, onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(20,30,40,0.45)', zIndex: 998, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ backgroundColor: '#fff', borderRadius: 10, padding: 26, maxWidth: 380, width: '90%', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
+    <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(20,30,40,0.45)', zIndex: 998, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="animate-scale-in" style={{ backgroundColor: '#fff', borderRadius: 10, padding: 26, maxWidth: 380, width: '90%', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 12px 0', color: '#2c3e50', fontSize: 17 }}>{state.title || 'Xác nhận'}</h3>
         <p style={{ margin: '0 0 22px 0', color: '#5a6c7a', fontSize: 14, lineHeight: 1.5 }}>{state.message}</p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>

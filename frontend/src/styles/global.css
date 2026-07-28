@@ -1,7 +1,4 @@
 @import "./variables.css";
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   font-family: var(--font-sans);
@@ -52,14 +49,21 @@ button, input, select, textarea {
 
 /* ── Buttons ─────────────────────────────────────────────── */
 .btn { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); border: none; border-radius: var(--r-md); font-weight: 500; cursor: pointer; transition: all var(--transition); }
+.btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-sm); }
 .btn-primary { background: var(--clr-primary); color: #fff; }
-.btn-primary:hover { background: var(--clr-primary-h); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-primary:hover:not(:disabled) { background: var(--clr-primary-h); }
 .btn-secondary { background: var(--clr-secondary); color: #fff; }
+.btn-success { background: var(--clr-success); color: #fff; }
+.btn-success:hover:not(:disabled) { background: var(--clr-secondary-h); }
+.btn-warning { background: var(--clr-warning); color: var(--clr-dark); }
 .btn-danger { background: var(--clr-danger); color: #fff; }
 .btn-outline { background: transparent; border: 1.5px solid var(--clr-primary); color: var(--clr-primary); }
-.btn-outline:hover { background: var(--clr-primary-bg); }
+.btn-outline:hover:not(:disabled) { background: var(--clr-primary-bg); }
 .btn-sm { padding: var(--sp-1) var(--sp-3); font-size: var(--text-sm); }
-.btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.btn:disabled { opacity: .6; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-icon { background: none; border: none; cursor: pointer; transition: opacity var(--transition); }
+.btn-icon:hover { opacity: .7; }
 
 /* ── Table ───────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; }
