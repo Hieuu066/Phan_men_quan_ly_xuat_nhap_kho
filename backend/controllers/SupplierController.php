@@ -1,5 +1,4 @@
 <?php
-// require_once __DIR__ . '/../utils/Response.php';
 
 class SupplierController {
     private const TABLE = "nha_cung_cap";

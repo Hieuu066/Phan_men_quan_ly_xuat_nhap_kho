@@ -10,7 +10,7 @@ class StatsController {
         foreach ($stmt->fetchAll() as $row)
         $res["users_by_role"][$row["role"]] = (int)$row["cnt"];
         $res["users_total"] = array_sum($res["users_by_role"] ?? [0]);
-        // Tổng số thực thể chính (bảng thật là san_pham, không phải items)
+        // Tổng số thực thể chính
         $res["total_products"] = (int)$db->query("SELECT COUNT(*) FROM san_pham")->fetchColumn();
         $res["items_active"] = (int)$db->query("SELECT COUNT(*) FROM san_pham WHERE status='active'")->fetchColumn();
         // Tăng trưởng 6 tháng gần nhất (dữ liệu cho biểu đồ)

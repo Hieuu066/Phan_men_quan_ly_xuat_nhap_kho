@@ -11,7 +11,6 @@ class TransactionController {
         // Lấy tham số phân trang từ URL
         $page = max(1, (int)($_GET["page"] ?? 1));
         $limit = max(1, min(100, (int)($_GET["per_page"] ?? self::PER_PAGE)));
-        // Tạo một bảng ảo (Subquery) bằng UNION ALL chứa tất cả giao dịch
         $baseSql = "
             SELECT * FROM (
                 SELECT id, code, 'import' AS type, total_amount, created_at, note,
@@ -58,8 +57,6 @@ class TransactionController {
         // Sắp xếp giao dịch mới nhất lên đầu
         $baseSql .= " ORDER BY created_at DESC";
         
-        // Pagination::run() chỉ TRẢ VỀ mảng [data, meta], không tự gửi response,
-        // nên phải gán kết quả rồi gọi Response::paged() thì client mới nhận được dữ liệu.
         $result = Pagination::run($baseSql, $params, $page, $limit);
         Response::paged($result["data"], $result["meta"]);
     }

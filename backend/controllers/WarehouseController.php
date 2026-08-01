@@ -12,7 +12,7 @@ class WarehouseController {
         $productId = (int)($_GET['product_id'] ?? 0);
         $qty = (int)($_GET['quantity'] ?? 0);
 
-        // Logic: Lấy các kho đang active và (sức chứa - tổng tồn kho hiện tại) >= số lượng cần nhập
+        // Lấy các kho đang active và (sức chứa - tổng tồn kho hiện tại) >= số lượng cần nhập
         $sql = "SELECT k.id AS kho_id, k.ten_kho, 
                        (k.suc_chua - COALESCE((SELECT SUM(so_luong_ton) FROM kho_ton_kho WHERE kho_id = k.id), 0)) AS available_capacity 
                 FROM kho_hang k 
@@ -37,7 +37,7 @@ class WarehouseController {
         $productId = (int)($_GET['product_id'] ?? 0);
         $qty = (int)($_GET['quantity'] ?? 0);
 
-        // Logic: Lấy các kho đang active và có số lượng tồn của sản phẩm >= số lượng cần xuất
+        // Lấy các kho đang active và có số lượng tồn của sản phẩm >= số lượng cần xuất
         $sql = "SELECT k.id AS kho_id, k.ten_kho, ktk.so_luong_ton AS available_stock 
                 FROM kho_hang k 
                 JOIN kho_ton_kho ktk ON k.id = ktk.kho_id 
@@ -159,8 +159,6 @@ class WarehouseController {
         $stmt->execute([$id]);
         if (!$stmt->fetch()) Response::err("Không tìm thấy kho hàng.", 404);
 
-        // Chặn xoá nếu kho vẫn còn hàng tồn — kho_ton_kho có ON DELETE CASCADE nên
-        // xoá thẳng sẽ âm thầm mất dữ liệu tồn kho nếu không kiểm tra trước.
         $stockStmt = $db->prepare("SELECT COALESCE(SUM(so_luong_ton), 0) FROM kho_ton_kho WHERE kho_id = ?");
         $stockStmt->execute([$id]);
         if ((int)$stockStmt->fetchColumn() > 0) {
@@ -171,7 +169,7 @@ class WarehouseController {
             $db->prepare("DELETE FROM " . self::TABLE . " WHERE id = ?")->execute([$id]);
             Response::ok(null, "Xoá kho hàng thành công!");
         } catch (PDOException $e) {
-            // Kho đã từng phát sinh phiếu nhập/xuất (FK RESTRICT trên phieu_nhap/phieu_xuat)
+            // Kho đã từng phát sinh phiếu nhập/xuất
             if ($e->getCode() == 23000) {
                 Response::err("Không thể xoá vì kho đã phát sinh phiếu nhập/xuất. Hãy đổi trạng thái thành 'inactive'.", 409);
             }

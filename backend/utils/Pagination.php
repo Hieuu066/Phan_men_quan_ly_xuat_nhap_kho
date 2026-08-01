@@ -26,13 +26,6 @@ class Pagination {
         $page = max(1, min($page, $totalPages));
         $offset = ($page - 1) * $limit;
         
-        // 3. Lấy dữ liệu trang hiện tại
-        // QUAN TRỌNG: PDO không cho phép trộn lẫn placeholder kiểu positional (?)
-        // và named (:x) trong CÙNG 1 câu lệnh. Các Controller hiện dùng ? cho điều
-        // kiện WHERE, nên LIMIT/OFFSET ở đây cũng phải theo đúng kiểu đó — nếu không
-        // sẽ lỗi "SQLSTATE[HY093]: mixed named and positional parameters" ngay khi
-        // có filter/search (params không rỗng). Khi $params rỗng hoặc là named,
-        // vẫn dùng :lmt/:ofs như cũ để tương thích ngược.
         $isPositional = $params !== [] && array_is_list($params);
         if ($isPositional) {
             $stmt = $db->prepare("{$baseSQL} LIMIT ? OFFSET ?");

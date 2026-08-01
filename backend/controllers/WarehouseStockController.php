@@ -12,11 +12,6 @@ class WarehouseStockController {
         // Lấy tham số phân trang từ URL
         $page = max(1, (int)($_GET["page"] ?? 1));
         $limit = max(1, min(100, (int)($_GET["per_page"] ?? self::PER_PAGE)));
-        // Xây dựng câu truy vấn cơ sở bằng JOIN thuần (không dùng VIEW — VIEW đã bị
-        // comment trong schema.sql vì một số hosting miễn phí như InfinityFree không
-        // cấp quyền CREATE VIEW/PROCEDURE).
-        // supplier_id ưu tiên nhà cung cấp riêng của lô hàng tại kho này (ktk.supplier_id),
-        // nếu chưa có thì lấy nhà cung cấp mặc định của sản phẩm (sp.supplier_id).
         $sql = "SELECT ktk.id, ktk.kho_id, k.ten_kho, ktk.product_id, sp.name AS product_name, sp.sku, 
                        COALESCE(ktk.supplier_id, sp.supplier_id) AS supplier_id, ncc.name AS supplier_name,
                        ktk.so_luong_ton, ktk.nguong_canh_bao 
@@ -42,15 +37,12 @@ class WarehouseStockController {
             $params[] = (int)$_GET['kho_id'];
         }
 
-        // Lọc theo 1 sản phẩm cụ thể (VD: xem sản phẩm X đang tồn ở những kho nào)
+        // Lọc theo 1 sản phẩm cụ thể
         if (!empty($_GET['product_id'])) {
             $sql .= " AND ktk.product_id = ?";
             $params[] = (int)$_GET['product_id'];
         }
 
-        // Lọc theo nhà cung cấp — lặp lại đúng biểu thức COALESCE ở trên vì WHERE không
-        // tham chiếu được alias của SELECT trong cùng 1 câu, và tên cột "supplier_id"
-        // để trần sẽ bị lỗi ambiguous (cả kho_ton_kho lẫn san_pham đều có cột này)
         if (!empty($_GET['supplier_id'])) {
             $sql .= " AND COALESCE(ktk.supplier_id, sp.supplier_id) = ?";
             $params[] = (int)$_GET['supplier_id'];
@@ -73,7 +65,6 @@ class WarehouseStockController {
         Auth::required();
         $db = getDB();
         
-        // Đọc dữ liệu JSON từ body của request PUT
         $body = json_decode(file_get_contents('php://input'), true);
         
         // Validation cơ bản
@@ -93,7 +84,6 @@ class WarehouseStockController {
             Response::err("Bản ghi tồn kho không tồn tại", 404);
         }
         
-        // Thực hiện cập nhật DB
         $stmt = $db->prepare("UPDATE kho_ton_kho SET nguong_canh_bao = ? WHERE id = ?");
         $stmt->execute([$nguong_canh_bao, $id]);
         

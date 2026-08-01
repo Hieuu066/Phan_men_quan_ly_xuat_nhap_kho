@@ -51,7 +51,7 @@ class UserController {
             foreach ($params as $key => $val) {
                 $stmt->bindValue($key, $val);
             }
-            // Bind params cho LIMIT và OFFSET (bắt buộc phải là kiểu INT)
+            // Bind params cho LIMIT và OFFSET
             $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             
@@ -63,7 +63,7 @@ class UserController {
                 "total" => $total,
                 "current_page" => $page,
                 "per_page" => $perPage,
-                "total_pages" => ceil($total / $perPage) // Tính tổng số trang
+                "total_pages" => ceil($total / $perPage)
             ];
             Response::paged($users, $meta);
 
@@ -93,13 +93,13 @@ class UserController {
 
     // Xử lý POST /api/users
     public static function store($body) {
-        Auth::role("admin"); // Chỉ admin mới được tạo user
+        Auth::role("admin");
         $db = getDB();
         // 2. Lấy dữ liệu từ Request Body
         $username = trim($body['username'] ?? '');
         $password = $body['password'] ?? '';
         $fullname = trim($body['full_name'] ?? '');
-        $role     = trim($body['role'] ?? 'user'); // Mặc định là người dùng bình thường
+        $role     = trim($body['role'] ?? 'user');
         $status   = trim($body['status'] ?? 'active');
 
         // 3. Validate dữ liệu đầu vào (Bắt buộc theo README)
@@ -162,17 +162,16 @@ class UserController {
 
     // Xử lý PUT /api/users/{id}
     public static function update($id, $body) {
-        Auth::role("admin"); // Chỉ admin mới được cập nhật user
+        Auth::role("admin");
         $db = getDB();
 
         // 2. Lấy dữ liệu từ Request Body
-        // Nếu client không gửi trường nào, biến tương ứng sẽ là null
         $password = $body['password'] ?? ''; 
         $fullname = isset($body['full_name']) ? trim($body['full_name']) : null;
         $role     = isset($body['role']) ? trim($body['role']) : null;
         $status   = isset($body['status']) ? trim($body['status']) : null;
 
-        // Validate role (nếu có gửi lên)
+        // Validate role
         if ($role !== null && !in_array($role, ['admin', 'user'])) {
             Response::err("Vai trò không hợp lệ (chỉ nhận 'admin' hoặc 'user').", 400);
         }
@@ -210,11 +209,6 @@ class UserController {
                 $params[':password'] = password_hash($password, PASSWORD_BCRYPT);
             }
 
-            // Nếu không có trường nào được gửi lên để cập nhật
-            // if (empty($updateFields)) {
-            //     Response::err("Không có dữ liệu nào được cung cấp để cập nhật.", 400);
-            // }
-
             // 5. Gắn mảng vào câu lệnh SQL và thực thi
             $sql = "UPDATE users SET " . implode(", ", $updateFields) . " WHERE id = :id";
             $stmt = $db->prepare($sql);
@@ -248,13 +242,10 @@ class UserController {
                 Response::err("Không tìm thấy người dùng.", 404);
             }
 
-            // Chặn trường hợp vô hiệu hoá tài khoản đã bị inactive từ trước
             if ($user['status'] === 'inactive') {
                 Response::err("Người dùng này đã bị vô hiệu hoá từ trước.", 400);
             }
 
-            // (Tuỳ chọn) Chặn Admin tự vô hiệu hoá chính mình để tránh sập hệ thống
-            // Giả sử session của bạn có lưu id: $_SESSION['user_id']
             if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $id) {
                 Response::err("Bạn không thể tự vô hiệu hoá tài khoản của chính mình.", 400);
             }
