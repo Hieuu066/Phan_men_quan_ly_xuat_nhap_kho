@@ -48,7 +48,7 @@ class ImportOrderController {
 
         $order['type'] = 'import';
 
-        // JOIN thêm kho_hang để lấy thông tin kho
+        // thêm kho_hang để lấy thông tin kho
         $stmtDetail = $db->prepare("
             SELECT c.product_id, s.name AS product_name, c.kho_id, k.ten_kho, c.quantity, c.unit_price, (c.quantity * c.unit_price) AS line_total
             FROM chi_tiet_phieu_nhap c
@@ -58,8 +58,6 @@ class ImportOrderController {
         ");
         $stmtDetail->execute([$id]);
         $order['details'] = $stmtDetail->fetchAll(PDO::FETCH_ASSOC);
-
-        // Ép kiểu chuẩn JSON (đảm bảo FE không bị lỗi parse String thành Number)
         $order['id'] = (int)$order['id'];
         $order['supplier_id'] = (int)$order['supplier_id'];
         $order['created_by'] = (int)$order['created_by'];
@@ -88,10 +86,9 @@ class ImportOrderController {
         try {
             $db->beginTransaction();
 
-            $createdBy = $_SESSION['user_id'] ?? 1; // Fallback nếu dev chưa gắn session
+            $createdBy = $_SESSION['user_id'] ?? 1;
             $note = $body['note'] ?? null;
-
-            // 1. Insert đầu phiếu (tạm thời để total_amount = 0, sẽ update sau khi tính tổng chi tiết)
+            // 1. Insert đầu phiếu
             $stmt = $db->prepare("INSERT INTO " . self::TABLE . " (supplier_id, created_by, note, total_amount) VALUES (?, ?, ?, 0)");
             $stmt->execute([$body['supplier_id'], $createdBy, $note]);
             $orderId = $db->lastInsertId();
@@ -101,7 +98,6 @@ class ImportOrderController {
             $db->prepare("UPDATE " . self::TABLE . " SET code = ? WHERE id = ?")->execute([$code, $orderId]);
 
             // 3. Insert chi tiết phiếu
-            // Chuẩn bị các statement cần thiết
             $stmtDetail = $db->prepare("INSERT INTO chi_tiet_phieu_nhap (phieu_nhap_id, product_id, kho_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)");
             $stmtCheckCapacity = $db->prepare("
                 SELECT k.id, k.ten_kho, k.suc_chua, COALESCE(SUM(ktk.so_luong_ton), 0) AS current_stock
@@ -158,7 +154,6 @@ class ImportOrderController {
                         $stmtFindAlternative->execute([$qty]);
                         $alternatives = $stmtFindAlternative->fetchAll(PDO::FETCH_ASSOC);
                         
-                        // Ném lỗi 409 để Rollback
                         http_response_code(409);
                         echo json_encode([
                             "success" => false,
@@ -195,8 +190,6 @@ class ImportOrderController {
             ");
             $stmtGetDetail->execute([$orderId]);
             $createdOrder['details'] = $stmtGetDetail->fetchAll(PDO::FETCH_ASSOC);
-
-            // Ép kiểu chuẩn JSON để FE không bị lỗi parse String thành Number
             $createdOrder['id'] = (int)$createdOrder['id'];
             $createdOrder['supplier_id'] = (int)$createdOrder['supplier_id'];
             $createdOrder['created_by'] = (int)$createdOrder['created_by'];
@@ -210,7 +203,6 @@ class ImportOrderController {
                 $detail['line_total'] = (int)$detail['line_total'];
             }
 
-            // Trả về đúng HTTP 201 Created cùng cấu trúc chuẩn
             http_response_code(201);
             echo json_encode([
                 "success" => true,

@@ -1,11 +1,7 @@
 <?php
 // backend/controllers/AuthController.php
 class AuthController {
-    // Xuất nhập kho nội bộ sẽ không cho phép tự ý đăng kí tài khoản
-    // public static function register(array $body): void { }
-
     public static function login(array $body): void {
-        // echo password_hash("Test1234", PASSWORD_BCRYPT, ["cost" => 12]);
         $username = strtolower(trim($body["username"] ?? ""));
         $password = $body["password"] ?? "";
         if (!$username || !$password) Response::err("Vui long nhap ten dang nhap va mat khau.");
@@ -32,8 +28,6 @@ class AuthController {
         $_SESSION["user_id"] = $user["id"];
         $_SESSION["user_name"] = $user["username"];
         $_SESSION["user_role"] = $user["role"];
-        // Cập nhật thời điểm đăng nhập cuối
-        // $db->prepare("UPDATE users SET last_login=NOW() WHERE id=?")->execute([$user["id"]]);
         Response::ok([
             "id" => $user["id"],
             "username" => $user["username"],

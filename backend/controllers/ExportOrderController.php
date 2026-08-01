@@ -44,11 +44,9 @@ class ExportOrderController {
         if (!$order) {
             Response::err("Không tìm thấy phiếu xuất", 404);
         }
-
-        // Bổ sung thuộc tính type theo api-spec.md
         $order['type'] = 'export';
 
-        // 2. Lấy danh sách chi tiết (JOIN với san_pham và kho_hang để lấy product_name, ten_kho và tính line_total)
+        // 2. Lấy danh sách chi tiết
         $stmtDetail = $db->prepare("
             SELECT c.product_id, s.name AS product_name, c.kho_id, k.ten_kho, c.quantity, c.unit_price, (c.quantity * c.unit_price) AS line_total
             FROM chi_tiet_phieu_xuat c
@@ -59,19 +57,17 @@ class ExportOrderController {
         $stmtDetail->execute([$id]);
         $order['details'] = $stmtDetail->fetchAll(PDO::FETCH_ASSOC);
 
-        // Ép kiểu chuẩn JSON
         $order['id'] = (int)$order['id'];
         $order['created_by'] = (int)$order['created_by'];
         $order['total_amount'] = (int)$order['total_amount'];
         
-        // Ép kiểu customer_id nếu bảng phiếu xuất của bạn có trường này
         if (isset($order['customer_id'])) {
             $order['customer_id'] = (int)$order['customer_id'];
         }
 
         foreach ($order['details'] as &$detail) {
             $detail['product_id'] = (int)$detail['product_id'];
-            $detail['kho_id'] = (int)$detail['kho_id']; // Bổ sung ép kiểu kho_id
+            $detail['kho_id'] = (int)$detail['kho_id'];
             $detail['quantity'] = (int)$detail['quantity'];
             $detail['unit_price'] = (int)$detail['unit_price'];
             $detail['line_total'] = (int)$detail['line_total'];
@@ -89,8 +85,6 @@ class ExportOrderController {
             Response::err("Vui lòng cung cấp đủ thông tin người nhận và danh sách sản phẩm", 400);
         }
 
-        // warehouse_mode: 'manual' (mặc định, giữ nguyên hành vi cũ — mỗi dòng phải có kho_id)
-        // hoặc 'auto' (hệ thống tự chọn kho còn nhiều hàng nhất, tự chia sang nhiều kho nếu 1 kho không đủ)
         $warehouseMode = in_array($body['warehouse_mode'] ?? 'manual', ['manual', 'auto'], true)
             ? $body['warehouse_mode'] ?? 'manual'
             : 'manual';
@@ -113,7 +107,6 @@ class ExportOrderController {
             $stmtDetail = $db->prepare("INSERT INTO chi_tiet_phieu_xuat (phieu_xuat_id, product_id, kho_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)");
             // Lock dòng dữ liệu tồn kho bằng FOR UPDATE
             $stmtCheckStock = $db->prepare("SELECT so_luong_ton FROM kho_ton_kho WHERE kho_id = ? AND product_id = ? FOR UPDATE");
-            
             // Update trừ tồn kho
             $stmtUpdateStock = $db->prepare("UPDATE kho_ton_kho SET so_luong_ton = so_luong_ton - ? WHERE kho_id = ? AND product_id = ?");
             
@@ -127,8 +120,7 @@ class ExportOrderController {
                 LIMIT 3
             ");
 
-            // Dùng cho warehouse_mode=auto: khoá + lấy TẤT CẢ kho đang hoạt động có tồn sản phẩm
-            // này, kho nhiều hàng nhất xếp trước — để phân bổ dần tới khi đủ số lượng yêu cầu.
+            // kho nhiều hàng nhất xếp trước — để phân bổ dần tới khi đủ số lượng yêu cầu.
             $stmtStockAllOrdered = $db->prepare("
                 SELECT ktk.kho_id, k.ten_kho, ktk.so_luong_ton
                 FROM kho_ton_kho ktk
@@ -148,12 +140,11 @@ class ExportOrderController {
                 $qtyNeeded = (int)$item['quantity'];
 
                 if ($warehouseMode === 'auto') {
-                    // ===== CHẾ ĐỘ TỰ ĐỘNG: hệ thống tự chọn kho, tự chia sang nhiều kho nếu cần =====
                     $stmtStockAllOrdered->execute([$productId]);
                     $stockRows = $stmtStockAllOrdered->fetchAll(PDO::FETCH_ASSOC);
                     $totalAvailable = array_sum(array_column($stockRows, 'so_luong_ton'));
 
-                    // Chỉ khi TỔNG tồn kho toàn hệ thống vẫn không đủ mới báo lỗi (đúng yêu cầu)
+                    // Chỉ khi TỔNG tồn kho toàn hệ thống vẫn không đủ mới báo lỗi
                     if ($totalAvailable < $qtyNeeded) {
                         $db->rollBack();
                         http_response_code(409);
@@ -165,7 +156,6 @@ class ExportOrderController {
                     }
 
                     // Phân bổ dần từ kho nhiều hàng nhất cho tới khi đủ số lượng yêu cầu
-                    // (1 dòng yêu cầu có thể tách thành nhiều dòng chi_tiet_phieu_xuat nếu phải lấy từ >1 kho)
                     $remaining = $qtyNeeded;
                     foreach ($stockRows as $row) {
                         if ($remaining <= 0) break;
@@ -180,7 +170,6 @@ class ExportOrderController {
                     continue;
                 }
 
-                // ===== CHẾ ĐỘ THỦ CÔNG (mặc định, giữ nguyên hành vi cũ) =====
                 if (empty($item['kho_id'])) {
                     throw new Exception("Thông tin chi tiết sản phẩm bị thiếu hoặc chưa chọn kho (cần có kho_id, hoặc gửi warehouse_mode=\"auto\" để hệ thống tự chọn)", 400);
                 }
@@ -200,7 +189,7 @@ class ExportOrderController {
 
                     $db->rollBack();
                     
-                    http_response_code(409); // Conflict
+                    http_response_code(409);
                     echo json_encode([
                         "success" => false,
                         "message" => "Sản phẩm ID {$productId} không đủ tồn tại kho ID {$khoId} (Tồn: {$currentStock}, Cần: {$qty}).",
@@ -225,14 +214,13 @@ class ExportOrderController {
             $db->prepare("UPDATE " . self::TABLE . " SET total_amount = ? WHERE id = ?")->execute([$totalAmount, $orderId]);
             $db->commit();
 
-            // 4. Trả về toàn bộ dữ liệu vừa tạo (Giống Import)
+            // 4. Trả về toàn bộ dữ liệu vừa tạo
             $stmtGet = $db->prepare("SELECT * FROM " . self::TABLE . " WHERE id = ?");
             $stmtGet->execute([$orderId]);
             $createdOrder = $stmtGet->fetch(PDO::FETCH_ASSOC);
-
             $createdOrder['type'] = 'export';
             
-            // JOIN với san_pham và kho_hang để lấy chi tiết hiển thị đầy đủ
+            // lấy chi tiết hiển thị đầy đủ
             $stmtGetDetail = $db->prepare("
                 SELECT c.product_id, s.name AS product_name, c.kho_id, k.ten_kho, c.quantity, c.unit_price, (c.quantity * c.unit_price) AS line_total
                 FROM chi_tiet_phieu_xuat c
@@ -242,8 +230,6 @@ class ExportOrderController {
             ");
             $stmtGetDetail->execute([$orderId]);
             $createdOrder['details'] = $stmtGetDetail->fetchAll(PDO::FETCH_ASSOC);
-
-            // Ép kiểu
             $createdOrder['id'] = (int)$createdOrder['id'];
             $createdOrder['created_by'] = (int)$createdOrder['created_by'];
             $createdOrder['total_amount'] = (int)$createdOrder['total_amount'];
@@ -266,7 +252,6 @@ class ExportOrderController {
 
         } catch (Exception $e) {
             $db->rollBack();
-            // Xử lý các lỗi hệ thống/code (Do ta đã tự ném 409 ở trên nên block catch 45000 của Trigger đã được gỡ bỏ)
             $statusCode = is_numeric($e->getCode()) && $e->getCode() >= 400 ? $e->getCode() : 500;
             Response::err("Lỗi tạo phiếu xuất: " . $e->getMessage(), $statusCode);
         }

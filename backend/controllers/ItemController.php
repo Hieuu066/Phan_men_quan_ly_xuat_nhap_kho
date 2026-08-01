@@ -58,7 +58,6 @@ class ItemController {
     public static function show(int $id): void {
         Auth::required();
         $db = getDB();
-        // Sửa: JOIN với nha_cung_cap để lấy đúng supplier_name
         $stmt = $db->prepare(
             "SELECT i.*, n.name AS supplier_name
             FROM " . self::TABLE . " i
@@ -123,7 +122,6 @@ class ItemController {
             if ($e->getCode() == 23000) {
                 Response::err("Mã SKU '{$sku}' đã tồn tại trong hệ thống. Vui lòng chọn mã khác.", 409);
             }
-            // Các lỗi DB khác
             Response::err("Lỗi máy chủ: " . $e->getMessage(), 500);
         }
         
@@ -144,7 +142,6 @@ class ItemController {
         $unit = trim($body["unit"] ?? $existing["unit"]);
         $mo_ta = trim($body["mo_ta"] ?? $existing["mo_ta"]);
         
-        // Lưu ý: supplier_id có thể là NULL, cần check isset thay vì empty
         $supplier_id = array_key_exists("supplier_id", $body) ? $body["supplier_id"] : $existing["supplier_id"];
         $price = isset($body["price"]) ? (int)$body["price"] : $existing["price"];
         $status = in_array($body["status"] ?? "", ["active", "inactive"]) ? $body["status"] : $existing["status"];
@@ -177,7 +174,6 @@ class ItemController {
             ], "Cập nhật thành công!");
             
         } catch (PDOException $e) {
-            // Bắt lỗi Unique Key nếu đổi mã SKU trùng với một sản phẩm khác đang có
             if ($e->getCode() == 23000) {
                 Response::err("Mã SKU '{$sku}' đã được sử dụng cho một sản phẩm khác.", 409);
             }
@@ -197,7 +193,6 @@ class ItemController {
             $db->prepare("DELETE FROM " . self::TABLE . " WHERE id=?")->execute([$id]);
             Response::ok(null, "Xóa sản phẩm thành công!");
         } catch (PDOException $e) {
-            // Lợi ích: Bắt lỗi 23000 giúp hệ thống không bị crash khi cố xóa sản phẩm đã có lịch sử giao dịch.
             if ($e->getCode() == 23000) {
                 Response::err("Không thể xóa vì sản phẩm đã phát sinh giao dịch. Vui lòng cập nhật trạng thái thành 'inactive'.", 409);
             }
@@ -207,9 +202,8 @@ class ItemController {
     /** GET /api/items/export?format=csv — Xuất CSV */
     public static function export(): void {
         Auth::role("admin");
-        $db = getDB(); // Đảm bảo bạn gọi đúng hàm lấy kết nối PDO của mình
+        $db = getDB();
         
-        // Cập nhật câu lệnh SQL: JOIN kho_ton_kho, dùng SUM()
         $stmt = $db->query(
             "SELECT 
                 i.sku, 
@@ -245,7 +239,7 @@ class ItemController {
                 $r["name"],
                 $r["mo_ta"],
                 $r["price"],
-                $r["tong_ton_kho"], // Ánh xạ đúng bí danh từ hàm SUM()
+                $r["tong_ton_kho"],
                 $r["status"],
                 $r["supplier_name"] ?? "Không xác định",
                 $r["created_at"]

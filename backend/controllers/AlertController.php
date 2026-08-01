@@ -6,13 +6,10 @@ class AlertController {
      * Phục vụ hiển thị Badge và danh sách nhắc nhở nhập hàng.
      */
     public static function lowStock() {
-        // Yêu cầu người dùng phải đăng nhập hợp lệ
         Auth::required();
         $db = getDB();
         
-        // Câu truy vấn: Tìm các bản ghi trong kho_ton_kho có so_luong_ton <= nguong_canh_bao
-        // (viết bằng JOIN thuần, không dùng VIEW — VIEW đã bị comment trong schema.sql vì
-        // một số hosting miễn phí như InfinityFree không cấp quyền CREATE VIEW/PROCEDURE)
+        //Tìm các bản ghi trong kho_ton_kho có so_luong_ton <= nguong_canh_bao
         $sql = "SELECT ktk.id AS kho_ton_kho_id, 
                        ktk.kho_id, k.ten_kho, 
                        ktk.product_id, sp.name AS product_name, sp.sku, 
@@ -24,20 +21,19 @@ class AlertController {
                 
         $params = [];
 
-        // Tính năng bổ sung: Hỗ trợ lọc cảnh báo theo kho cụ thể (nếu Front-end cần)
+        //Hỗ trợ lọc cảnh báo theo kho cụ thể (nếu Front-end cần)
         if (!empty($_GET['kho_id'])) {
             $sql .= " AND ktk.kho_id = ?";
             $params[] = (int)$_GET['kho_id'];
         }
 
-        // Ưu tiên hiển thị những mặt hàng có tồn kho thấp nhất (nguy cấp nhất) lên trên cùng
+        //Ưu tiên hiển thị những mặt hàng có tồn kho thấp nhất (nguy cấp nhất) lên trên cùng
         $sql .= " ORDER BY ktk.so_luong_ton ASC";
                 
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Cấu trúc lại Data trả về, đếm sẵn số lượng để tiện cho việc hiển thị Badge
         $responseData = [
             'total_alerts' => count($alerts),
             'alerts'       => $alerts
